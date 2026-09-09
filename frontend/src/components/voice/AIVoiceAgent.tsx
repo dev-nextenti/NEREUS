@@ -246,12 +246,24 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
 
-    // Resolve active recognition speechLang:
+    // Resolve active recognition speechLang adaptively:
     let targetSpeechLang = selectedLanguage.speechLang;
     if (selectedLanguage.code === "auto" || isAutoDetect) {
-      // In auto mode, use neutral en-IN (Indian English) which transcribes both English and transliterated Indic words
-      // Zero bias toward any single regional state
-      targetSpeechLang = "en-IN";
+      if (detectedLanguage && detectedLanguage.code !== "auto") {
+        targetSpeechLang = detectedLanguage.speechLang;
+      } else {
+        const navLang = (navigator.language || (navigator.languages && navigator.languages[0]) || "").toLowerCase();
+        if (navLang.startsWith("ta")) targetSpeechLang = "ta-IN";
+        else if (navLang.startsWith("te")) targetSpeechLang = "te-IN";
+        else if (navLang.startsWith("hi")) targetSpeechLang = "hi-IN";
+        else if (navLang.startsWith("ml")) targetSpeechLang = "ml-IN";
+        else if (navLang.startsWith("kn")) targetSpeechLang = "kn-IN";
+        else if (navLang.startsWith("mr")) targetSpeechLang = "mr-IN";
+        else if (navLang.startsWith("gu")) targetSpeechLang = "gu-IN";
+        else if (navLang.startsWith("bn")) targetSpeechLang = "bn-IN";
+        else if (navLang.startsWith("or")) targetSpeechLang = "or-IN";
+        else targetSpeechLang = "en-IN";
+      }
     }
 
     recognition.lang = targetSpeechLang;

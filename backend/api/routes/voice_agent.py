@@ -64,6 +64,104 @@ LANGUAGE_NAMES: Dict[str, str] = {
 }
 
 
+# Comprehensive lexical dictionaries for high-precision transliterated Indic language detection
+VOCAB_PATTERNS: Dict[str, Dict[str, List[str]]] = {
+    "ta": {
+        "high": [
+            "eppadi", "irukku", "irukkiradhu", "irukirathu", "irukkuthu", "irukkum",
+            "vanilai", "vaanilai", "kadal", "kadalooram", "kadaloora", "alai", "alaigal",
+            "alavugal", "katru", "kaathu", "kaatru", "meen", "meenpidi", "meenavar",
+            "meenavargal", "nalaikku", "naalai", "chellalama", "sellalama", "pogalama",
+            "enna", "mudiyuma", "paathukaappu", "abayam", "echcharikkai", "puyal",
+            "innikku", "inniku", "kaalai", "maalai", "sollunga", "parunga", "valaikuda", "kadalukku"
+        ],
+        "mid": ["illa", "illai", "ama", "aama", "venum", "koodathu", "aachu", "romba", "nalla"]
+    },
+    "te": {
+        "high": [
+            "ela", "undi", "vundi", "untundi", "vatavaranam", "vaatavaranam", "samudram",
+            "kadali", "chepalu", "chepala", "veta", "vepa", "alalu", "gaali", "gali",
+            "repu", "repati", "tupanu", "toofanu", "tufanu", "vellavacha", "velloccha",
+            "vellala", "cheppandi", "eeroju", "udayam", "sayantram", "ippudu",
+            "varsham", "bhadrata", "surakshitam", "hecharika", "teeram", "padava"
+        ],
+        "mid": ["ledu", "avunu", "kadu", "chala", "bavundi", "bagundi", "kavali"]
+    },
+    "ml": {
+        "high": [
+            "engane", "enganeyundu", "kaalavastha", "kalavastha", "kadal",
+            "kadalil", "thiramala", "thiramaala", "kaattu", "kattu", "meen", "matsyam",
+            "meenpidutham", "pokaamo", "pokamo", "pokan", "patto", "pattumo", "nale",
+            "naale", "surakshitham", "munnariyippu", "chuzhalikkaattu", "mazha",
+            "innum", "ravile", "vaikitt", "theeram", "vallam", "parayu", "ariyaamo"
+        ],
+        "mid": ["illa", "undu", "aano", "alla", "aanu", "valare", "nalla", "kooduthal"]
+    },
+    "kn": {
+        "high": [
+            "hege", "hegide", "havamana", "samudra", "alegalu", "alegal",
+            "gaali", "meenu", "meenugarike", "naale", "surakshita", "eccharike",
+            "chandamaruta", "karavali", "teera", "hogabahuda", "hogala", "male",
+            "ivattu", "beligge", "sanje", "doni", "heli", "yavaga"
+        ],
+        "mid": ["ide", "illa", "houdu", "alla", "thumba", "bahala", "beku"]
+    },
+    "gu": {
+        "high": [
+            "kem", "kem chhe", "kevu", "kevu chhe", "havaaman", "daryo", "dariya",
+            "mojan", "mojano", "pavan", "machhimar", "matsya", "kaale", "salaamat",
+            "chetavni", "vavazodu", "kantho", "varsad", "aaje", "savare", "javay",
+            "javanu", "bolone", "kaho"
+        ],
+        "mid": ["chhe", "nathi", "ha", "na", "ghano", "saru", "ketlu"]
+    },
+    "bn": {
+        "high": [
+            "kemon", "kemon achhe", "kemon ache", "abohawa", "shomudro", "somudro",
+            "dheu", "batas", "machh", "mach", "jawa jabe", "jaoa jabe",
+            "shokal", "shokale", "nirapod", "shotorkota", "ghurnijhor", "brishti",
+            "ekhon", "bolun", "upokul", "trawler"
+        ],
+        "mid": ["achhe", "ache", "nei", "hobe", "khub", "bhalo"]
+    },
+    "mr": {
+        "high": [
+            "kasa", "kashi", "kase", "kasa ahe", "kashi ahe", "havaman", "samudra",
+            "darya", "lata", "laata", "vara", "vaara", "mase", "masemari", "udya",
+            "jaavu shakto", "jaave ka", "surakshit", "dhoka", "ishara", "vadal",
+            "kinarpatti", "paus", "sakali", "sandhyakali", "sanga", "boti"
+        ],
+        "mid": ["ahe", "aahe", "nahi", "naahi", "asel", "khup", "changla"]
+    },
+    "or": {
+        "high": [
+            "kemiti", "kemiti achhi", "kemiti achi", "panipaga", "samudra", "dheu",
+            "pabana", "machha", "machhadhara", "kali", "nirapada", "satarkata",
+            "batya", "upakula", "barsha", "aaji", "sakale", "kuhantu", "jaipariba"
+        ],
+        "mid": ["achhi", "achi", "nahin", "heba", "bhala", "tike"]
+    },
+    "hi": {
+        "high": [
+            "kaisa", "kaise", "kaisi", "mausam", "samundar", "machli", "machhli",
+            "toofan", "leher", "leherein", "lahar", "lahrein", "barish", "baarish",
+            "surakshit", "khatra", "chetavni", "machuare", "machhuare", "hawa",
+            "rahega", "rahegi", "sakta", "sakti", "sakte", "batao", "chahiye"
+        ],
+        "mid": ["kya", "hai", "hain", "hoga", "hogi", "honge", "aaj", "kal", "subah", "shaam", "pani", "paani"]
+    },
+    "en": {
+        "high": [
+            "weather", "wave", "wind", "cyclone", "safe", "safety", "fishing",
+            "fish", "sea", "ocean", "port", "harbor", "temperature", "swell",
+            "tomorrow", "today", "forecast", "tide", "height", "speed", "advisory",
+            "warning", "vessel", "boat", "sail", "departure", "venture"
+        ],
+        "mid": ["what", "how", "can", "is", "are", "the", "in", "to", "for", "me", "tell"]
+    }
+}
+
+
 def detect_language(text: str) -> str:
     """
     Intelligently detects Indian language from Unicode scripts and coastal lexical markers.
@@ -72,28 +170,27 @@ def detect_language(text: str) -> str:
     if not text or not text.strip():
         return "en"
 
-    deval_count = 0
+    # 1. Authoritative check for native non-Devanagari Indic scripts
+    script_counts = {
+        "ml": 0, "ta": 0, "te": 0, "kn": 0, "gu": 0, "bn": 0, "or": 0, "deval": 0
+    }
     for ch in text:
         cp = ord(ch)
-        if 0x0D00 <= cp <= 0x0D7F:
-            return "ml"  # Malayalam
-        if 0x0B80 <= cp <= 0x0BFF:
-            return "ta"  # Tamil
-        if 0x0C00 <= cp <= 0x0C7F:
-            return "te"  # Telugu
-        if 0x0C80 <= cp <= 0x0CFF:
-            return "kn"  # Kannada
-        if 0x0A80 <= cp <= 0x0AFF:
-            return "gu"  # Gujarati
-        if 0x0980 <= cp <= 0x09FF:
-            return "bn"  # Bengali
-        if 0x0B00 <= cp <= 0x0B7F:
-            return "or"  # Odia
-        if 0x0900 <= cp <= 0x097F:
-            deval_count += 1
+        if 0x0D00 <= cp <= 0x0D7F: script_counts["ml"] += 1
+        elif 0x0B80 <= cp <= 0x0BFF: script_counts["ta"] += 1
+        elif 0x0C00 <= cp <= 0x0C7F: script_counts["te"] += 1
+        elif 0x0C80 <= cp <= 0x0CFF: script_counts["kn"] += 1
+        elif 0x0A80 <= cp <= 0x0AFF: script_counts["gu"] += 1
+        elif 0x0980 <= cp <= 0x09FF: script_counts["bn"] += 1
+        elif 0x0B00 <= cp <= 0x0B7F: script_counts["or"] += 1
+        elif 0x0900 <= cp <= 0x097F: script_counts["deval"] += 1
 
-    # Devanagari script: accurately separate Marathi from Hindi
-    if deval_count > 0:
+    for s_code in ["ml", "ta", "te", "kn", "gu", "bn", "or"]:
+        if script_counts[s_code] > 0:
+            return s_code
+
+    # 2. Devanagari script: accurately separate Marathi from Hindi
+    if script_counts["deval"] > 0:
         if any(c in text for c in ["\u0933", "\u0931"]):  # ळ, ऱ
             return "mr"
         lower = text.lower()
@@ -105,75 +202,38 @@ def detect_language(text: str) -> str:
             return "mr"
         return "hi"
 
-    # Romanized transliteration heuristics for coastal queries
+    # 3. Token-Based Weighted Scoring for Romanized / Transliterated text
     lower = text.lower()
+    raw_tokens = re.findall(r"\b[a-z]{2,}\b", lower)
+    token_set = set(raw_tokens)
 
-    # Distinctive regional coastal phrases first (linguistic tokens only, NO city names)
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "eppadi", "irukku", "irukkirathu", "vanilai", "alavugal", "alai", "kadal",
-        "meen", "meenpidi", "katru", "kaathu", "nalaikku", "chellalama", "pogalama",
-        "enna", "kadalooram"
-    ]):
-        return "ta"
+    scores = {code: 0.0 for code in VOCAB_PATTERNS}
 
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "ela undi", "ela vundi", "vatavaranam", "samudram", "chepalu", "chepala",
-        "alalu", "gaali", "repu", "repati", "tupanu", "vellavacha", "velloccha"
-    ]):
-        return "te"
+    for code, dicts in VOCAB_PATTERNS.items():
+        # High-confidence domain keywords
+        for w in dicts["high"]:
+            if " " in w:
+                if w in lower:
+                    scores[code] += 15.0
+            else:
+                if w in token_set:
+                    scores[code] += 8.0
+        # Mid-confidence markers
+        for w in dicts["mid"]:
+            if w in token_set:
+                scores[code] += 2.0
 
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "enganeyundu", "engane undu", "kaalavastha", "kadalil", "thiramala",
-        "meenpidutham", "pokaamo", "pokamo", "kaattu", "kattu", "surakshitham",
-        "nale"
-    ]):
-        return "ml"
+    sorted_scores = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    top_lang, top_score = sorted_scores[0]
 
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "hegide", "hege ide", "havamana", "meenugarike", "alegalu", "naale",
-        "surakshita", "karavali"
-    ]):
-        return "kn"
+    if top_score >= 6.0:
+        return top_lang
 
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "kem chhe", "kevu chhe", "havaaman", "daryo", "mojan", "pavan",
-        "machhimar", "kaale", "salaamat"
-    ]):
-        return "gu"
-
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "kemon achhe", "kemon ache", "abohawa", "dheu", "batas", "machh",
-        "shomudro", "jawa jabe", "kal shokale"
-    ]):
-        return "bn"
-
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "kemiti achhi", "kemiti achi", "panipaga", "machhadhara", "kali",
-        "nirapada"
-    ]):
-        return "or"
-
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "kasa ahe", "kashi ahe", "havaman", "lata", "vara", "udya",
-        "masemari", "jaavu shakto", "kinarpatti"
-    ]):
-        return "mr"
-
-    # Strict multi-word or unambiguous Hindi coastal phrases (do NOT match isolated 'kya' or 'hai')
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "kaisa hai", "kaise hai", "kya mausam", "mausam kaisa", "machli pakadna",
-        "machli pakadne", "samundar me", "lahrein", "pani kaisa", "toofan ka",
-        "ja sakte hai", "surakshit hai", "kaisa mausam rahega"
-    ]):
-        return "hi"
-
-    # English marine keywords
-    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
-        "weather", "wave", "wind", "cyclone", "safe", "safety", "fishing",
-        "fish", "sea", "ocean", "port", "harbor", "temperature", "swell",
-        "tomorrow", "today", "forecast", "tide", "height", "speed"
-    ]):
+    if scores["en"] > 0:
         return "en"
+
+    if top_score > 0:
+        return top_lang
 
     return "en"
 

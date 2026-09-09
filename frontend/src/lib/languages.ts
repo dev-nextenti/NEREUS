@@ -187,8 +187,105 @@ export const getLanguageByCode = (code: string): VoiceLanguage => {
   return match || BUILTIN_LANGUAGES[0];
 };
 
+// Comprehensive lexical dictionaries for high-precision transliterated Indic language detection
+const VOCAB_PATTERNS: Record<string, { high: string[]; mid: string[] }> = {
+  ta: {
+    high: [
+      "eppadi", "irukku", "irukkiradhu", "irukirathu", "irukkuthu", "irukkum",
+      "vanilai", "vaanilai", "kadal", "kadalooram", "kadaloora", "alai", "alaigal",
+      "alavugal", "katru", "kaathu", "kaatru", "meen", "meenpidi", "meenavar",
+      "meenavargal", "nalaikku", "naalai", "chellalama", "sellalama", "pogalama",
+      "enna", "mudiyuma", "paathukaappu", "abayam", "echcharikkai", "puyal",
+      "innikku", "inniku", "kaalai", "maalai", "sollunga", "parunga", "valaikuda", "kadalukku"
+    ],
+    mid: ["illa", "illai", "ama", "aama", "venum", "koodathu", "aachu", "romba", "nalla"]
+  },
+  te: {
+    high: [
+      "ela", "undi", "vundi", "untundi", "vatavaranam", "vaatavaranam", "samudram",
+      "kadali", "chepalu", "chepala", "veta", "vepa", "alalu", "gaali", "gali",
+      "repu", "repati", "tupanu", "toofanu", "tufanu", "vellavacha", "velloccha",
+      "vellala", "cheppandi", "eeroju", "udayam", "sayantram", "ippudu",
+      "varsham", "bhadrata", "surakshitam", "hecharika", "teeram", "padava"
+    ],
+    mid: ["ledu", "avunu", "kadu", "chala", "bavundi", "bagundi", "kavali"]
+  },
+  ml: {
+    high: [
+      "engane", "enganeyundu", "kaalavastha", "kalavastha", "kadal",
+      "kadalil", "thiramala", "thiramaala", "kaattu", "kattu", "meen", "matsyam",
+      "meenpidutham", "pokaamo", "pokamo", "pokan", "patto", "pattumo", "nale",
+      "naale", "surakshitham", "munnariyippu", "chuzhalikkaattu", "mazha",
+      "innum", "ravile", "vaikitt", "theeram", "vallam", "parayu", "ariyaamo"
+    ],
+    mid: ["illa", "undu", "aano", "alla", "aanu", "valare", "nalla", "kooduthal"]
+  },
+  kn: {
+    high: [
+      "hege", "hegide", "havamana", "samudra", "alegalu", "alegal",
+      "gaali", "meenu", "meenugarike", "naale", "surakshita", "eccharike",
+      "chandamaruta", "karavali", "teera", "hogabahuda", "hogala", "male",
+      "ivattu", "beligge", "sanje", "doni", "heli", "yavaga"
+    ],
+    mid: ["ide", "illa", "houdu", "alla", "thumba", "bahala", "beku"]
+  },
+  gu: {
+    high: [
+      "kem", "kem chhe", "kevu", "kevu chhe", "havaaman", "daryo", "dariya",
+      "mojan", "mojano", "pavan", "machhimar", "matsya", "kaale", "salaamat",
+      "chetavni", "vavazodu", "kantho", "varsad", "aaje", "savare", "javay",
+      "javanu", "bolone", "kaho"
+    ],
+    mid: ["chhe", "nathi", "ha", "na", "ghano", "saru", "ketlu"]
+  },
+  bn: {
+    high: [
+      "kemon", "kemon achhe", "kemon ache", "abohawa", "shomudro", "somudro",
+      "dheu", "batas", "machh", "mach", "jawa jabe", "jaoa jabe",
+      "shokal", "shokale", "nirapod", "shotorkota", "ghurnijhor", "brishti",
+      "ekhon", "bolun", "upokul", "trawler"
+    ],
+    mid: ["achhe", "ache", "nei", "hobe", "khub", "bhalo"]
+  },
+  mr: {
+    high: [
+      "kasa", "kashi", "kase", "kasa ahe", "kashi ahe", "havaman", "samudra",
+      "darya", "lata", "laata", "vara", "vaara", "mase", "masemari", "udya",
+      "jaavu shakto", "jaave ka", "surakshit", "dhoka", "ishara", "vadal",
+      "kinarpatti", "paus", "sakali", "sandhyakali", "sanga", "boti"
+    ],
+    mid: ["ahe", "aahe", "nahi", "naahi", "asel", "khup", "changla"]
+  },
+  or: {
+    high: [
+      "kemiti", "kemiti achhi", "kemiti achi", "panipaga", "samudra", "dheu",
+      "pabana", "machha", "machhadhara", "kali", "nirapada", "satarkata",
+      "batya", "upakula", "barsha", "aaji", "sakale", "kuhantu", "jaipariba"
+    ],
+    mid: ["achhi", "achi", "nahin", "heba", "bhala", "tike"]
+  },
+  hi: {
+    high: [
+      "kaisa", "kaise", "kaisi", "mausam", "samundar", "machli", "machhli",
+      "toofan", "leher", "leherein", "lahar", "lahrein", "barish", "baarish",
+      "surakshit", "khatra", "chetavni", "machuare", "machhuare", "hawa",
+      "rahega", "rahegi", "sakta", "sakti", "sakte", "batao", "chahiye"
+    ],
+    mid: ["kya", "hai", "hain", "hoga", "hogi", "honge", "aaj", "kal", "subah", "shaam", "pani", "paani"]
+  },
+  en: {
+    high: [
+      "weather", "wave", "wind", "cyclone", "safe", "safety", "fishing",
+      "fish", "sea", "ocean", "port", "harbor", "temperature", "swell",
+      "tomorrow", "today", "forecast", "tide", "height", "speed", "advisory",
+      "warning", "vessel", "boat", "sail", "departure", "venture"
+    ],
+    mid: ["what", "how", "can", "is", "are", "the", "in", "to", "for", "me", "tell"]
+  }
+};
+
 /**
- * High-speed Unicode script & lexical language classifier for Indian languages.
+ * High-speed Unicode script & weighted lexical language classifier for Indian languages.
  */
 export const detectLanguageFromText = (text: string): VoiceLanguage => {
   if (!text || !text.trim()) return AUTO_LANGUAGE;
@@ -214,7 +311,7 @@ export const detectLanguageFromText = (text: string): VoiceLanguage => {
     else if (cp >= 0x0b00 && cp <= 0x0b7f) odiaCount++;
   }
 
-  // 1. Check distinct non-Devanagari Indic scripts first
+  // 1. Authoritative check for native non-Devanagari Indic scripts
   if (malayalamCount > 0) return getLanguageByCode("ml");
   if (tamilCount > 0) return getLanguageByCode("ta");
   if (teluguCount > 0) return getLanguageByCode("te");
@@ -238,43 +335,45 @@ export const detectLanguageFromText = (text: string): VoiceLanguage => {
     return getLanguageByCode("hi");
   }
 
-  // 3. Romanized transliteration heuristics for coastal queries
+  // 3. Token-Based Weighted Scoring for Romanized / Transliterated text
   const lower = text.toLowerCase();
+  const rawTokens = lower.match(/\b[a-z]{2,}\b/g) || [];
+  const tokenSet = new Set(rawTokens);
 
-  // Distinctive regional coastal phrases first (linguistic tokens only, NO city names)
-  if (/\b(eppadi|irukku|irukkirathu|vanilai|alavugal|alai|kadal|meen|meenpidi|katru|kaathu|nalaikku|chellalama|pogalama|enna|kadalooram)\b/.test(lower)) {
-    return getLanguageByCode("ta");
-  }
-  if (/\b(ela undi|ela vundi|vatavaranam|samudram|chepalu|chepala|alalu|gaali|repu|repati|tupanu|vellavacha|velloccha)\b/.test(lower)) {
-    return getLanguageByCode("te");
-  }
-  if (/\b(enganeyundu|engane undu|kaalavastha|kadalil|thiramala|meenpidutham|pokaamo|pokamo|kaattu|kattu|surakshitham|nale)\b/.test(lower)) {
-    return getLanguageByCode("ml");
-  }
-  if (/\b(hegide|hege ide|havamana|meenugarike|alegalu|naale|surakshita|karavali)\b/.test(lower)) {
-    return getLanguageByCode("kn");
-  }
-  if (/\b(kem chhe|kevu chhe|havaaman|daryo|mojan|pavan|machhimar|kaale|salaamat)\b/.test(lower)) {
-    return getLanguageByCode("gu");
-  }
-  if (/\b(kemon achhe|kemon ache|abohawa|dheu|batas|machh|shomudro|jawa jabe|kal shokale)\b/.test(lower)) {
-    return getLanguageByCode("bn");
-  }
-  if (/\b(kemiti achhi|kemiti achi|panipaga|machhadhara|kali|nirapada)\b/.test(lower)) {
-    return getLanguageByCode("or");
-  }
-  if (/\b(kasa ahe|kashi ahe|havaman|lata|vara|udya|masemari|jaavu shakto|kinarpatti)\b/.test(lower)) {
-    return getLanguageByCode("mr");
+  const scores: Record<string, number> = {};
+  for (const code of Object.keys(VOCAB_PATTERNS)) {
+    scores[code] = 0;
   }
 
-  // Strict multi-word or unambiguous Hindi coastal phrases (do NOT match isolated 'kya' or 'hai')
-  if (/\b(kaisa hai|kaise hai|kya mausam|mausam kaisa|machli pakadna|machli pakadne|samundar me|lahrein|pani kaisa|toofan ka|ja sakte hai|surakshit hai|kaisa mausam rahega)\b/.test(lower)) {
-    return getLanguageByCode("hi");
+  for (const [code, dicts] of Object.entries(VOCAB_PATTERNS)) {
+    // High-confidence domain keywords
+    for (const w of dicts.high) {
+      if (w.includes(" ")) {
+        if (lower.includes(w)) scores[code] += 15.0;
+      } else {
+        if (tokenSet.has(w)) scores[code] += 8.0;
+      }
+    }
+    // Mid-confidence markers
+    for (const w of dicts.mid) {
+      if (tokenSet.has(w)) scores[code] += 2.0;
+    }
   }
 
-  // English marine keywords
-  if (/\b(weather|wave|wind|cyclone|safe|safety|fishing|fish|sea|ocean|port|harbor|temperature|swell|tomorrow|today|forecast|tide|height|speed)\b/.test(lower)) {
+  // Find top score
+  const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+  const [topCode, topScore] = sorted[0];
+
+  if (topScore >= 6.0) {
+    return getLanguageByCode(topCode);
+  }
+
+  if (scores["en"] > 0) {
     return getLanguageByCode("en");
+  }
+
+  if (topScore > 0) {
+    return getLanguageByCode(topCode);
   }
 
   return getLanguageByCode("en");
