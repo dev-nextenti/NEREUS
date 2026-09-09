@@ -300,9 +300,9 @@ async def handle_voice_query(
     query_text = req.query.strip()
     lang = req.language if req.language and req.language != "auto" else detect_language(query_text)
 
-    # Resolve active Gemini API key (only real Google AI Studio keys start with AIzaSy)
+    # Resolve active Gemini API key (supports Google AI Studio AIzaSy and Vertex/API AQ. keys)
     active_key = get_gemini_api_key(req.api_key or x_gemini_api_key)
-    has_valid_user_key = bool(active_key and active_key.startswith("AIzaSy"))
+    has_valid_user_key = bool(active_key and len(active_key) > 20 and not active_key.startswith("placeholder"))
 
     # 1. Perform Real-Time Online Regional Research (parallel, 8s cap)
     lat = req.location.get("lat") or req.location.get("latitude") if req.location else None
@@ -358,19 +358,30 @@ async def handle_voice_query(
                     f"User asks in {LANGUAGE_NAMES.get(lang, 'English')}: '{query_text}'. "
                     f"Provide live regional marine safety advice based on current live conditions."
                 )
-                resp = client.models.generate_content(
-                    model="gemini-3.6-flash",
-                    contents=user_prompt,
-                    config={"system_instruction": system_instruction}
-                )
-                return resp.text.strip() if resp.text else ""
+                candidate_models = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.6-flash", "gemini-3.1-flash-lite"]
+                for mdl in candidate_models:
+                    try:
+                        resp = client.models.generate_content(
+                            model=mdl,
+                            contents=user_prompt,
+                            config={"system_instruction": system_instruction}
+                        )
+                        if resp and resp.text:
+                            return resp.text.strip(), mdl
+                    except Exception as err:
+                        err_str = str(err).lower()
+                        if any(x in err_str for x in ["429", "503", "resource_exhausted", "high demand", "unavailable"]):
+                            continue
+                        break
+                return "", ""
 
-            reply_text = await asyncio.wait_for(
+            gemini_res = await asyncio.wait_for(
                 loop.run_in_executor(None, _call_gemini),
-                timeout=6.0
+                timeout=18.0
             )
-            if reply_text:
-                used_engine = "Gemini 3.6 Flash (Custom Key + Live Grounding)"
+            if gemini_res and gemini_res[0]:
+                reply_text = gemini_res[0]
+                used_engine = f"Google Gemini ({gemini_res[1]} + Live Grounding)"
         except Exception as e:
             print(f"[VoiceAgent] Gemini notice ({type(e).__name__}); using live research synthesizer.")
             reply_text = ""
@@ -491,13 +502,24 @@ async def voice_agent_websocket(websocket: WebSocket):
                 try:
                     client = genai.Client(api_key=active_key)
                     sys_inst = build_system_instruction(research.get("summary", ""))
-                    chat = client.chats.create(
-                        model="gemini-3.6-flash",
-                        config=dict(system_instruction=sys_inst)
-                    )
-                    resp = chat.send_message(f"Mariner asks in {lang}: {query_text}")
-                    reply_text = resp.text.strip()
+                    for mdl in ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.6-flash", "gemini-3.1-flash-lite"]:
+                        try:
+                            resp = client.models.generate_content(
+                                model=mdl,
+                                contents=f"Mariner asks in {lang}: {query_text}",
+                                config={"system_instruction": sys_inst}
+                            )
+                            if resp and resp.text:
+                                reply_text = resp.text.strip()
+                                break
+                        except Exception as m_err:
+                            err_str = str(m_err).lower()
+                            if any(x in err_str for x in ["429", "503", "resource_exhausted", "high demand", "unavailable"]):
+                                continue
+                            break
                 except Exception:
+                    pass
+                if not reply_text:
                     reply_text = synthesize_dynamic_advisory(research, lang)
 
                 await websocket.send_text(json.dumps({

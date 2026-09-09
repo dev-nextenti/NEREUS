@@ -51,15 +51,12 @@ def get_gemini_api_key(client_override: Optional[str] = None) -> str:
 
     cfg = _read_config_file()
     key = cfg.get("gemini_api_key", "").strip()
-    if key and len(key) > 8 and key != DEFAULT_FALLBACK_KEY:
+    if key and len(key) > 8:
         return key
 
     env_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if env_key and len(env_key) > 8:
         return env_key
-
-    if key:
-        return key
 
     return DEFAULT_FALLBACK_KEY
 
@@ -105,36 +102,43 @@ def test_gemini_key(api_key: str) -> Dict[str, Any]:
         }
 
     clean_key = api_key.strip()
-    try:
-        client = genai.Client(api_key=clean_key)
-        # 1-token test prompt to verify key validity and quota
-        res = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents="ping",
-        )
+    candidate_models = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.6-flash", "gemini-3.1-flash-lite"]
+    last_err = ""
+    for model_name in candidate_models:
+        try:
+            client = genai.Client(api_key=clean_key)
+            res = client.models.generate_content(
+                model=model_name,
+                contents="ping",
+            )
+            return {
+                "valid": True,
+                "status": "ACTIVE",
+                "model": f"models/{model_name}",
+                "message": f"API key successfully verified. Google Gemini ({model_name}) is ONLINE with active quota.",
+            }
+        except Exception as e:
+            err_msg = str(e)
+            last_err = err_msg
+            if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                continue
+            elif "400" in err_msg or "INVALID_ARGUMENT" in err_msg or "API_KEY_INVALID" in err_msg or "not valid" in err_msg.lower():
+                return {
+                    "valid": False,
+                    "status": "INVALID_KEY",
+                    "message": "API Key is invalid or malformed. Verify your key in Google AI Studio.",
+                }
+            else:
+                continue
+
+    if "429" in last_err or "RESOURCE_EXHAUSTED" in last_err:
         return {
-            "valid": True,
-            "status": "ACTIVE",
-            "model": "models/gemini-3.6-flash",
-            "message": "API key successfully verified. Google Gemini 3.6 Flash is ONLINE with active quota.",
+            "valid": False,
+            "status": "QUOTA_EXHAUSTED",
+            "message": "API Key quota exceeded (HTTP 429 Resource Exhausted). Please check your plan or retry shortly.",
         }
-    except Exception as e:
-        err_msg = str(e)
-        if "429" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-            return {
-                "valid": False,
-                "status": "QUOTA_EXHAUSTED",
-                "message": "API Key quota exceeded (HTTP 429 Resource Exhausted). Please use a key with available credits.",
-            }
-        elif "400" in err_msg or "INVALID_ARGUMENT" in err_msg or "API_KEY_INVALID" in err_msg or "not valid" in err_msg.lower():
-            return {
-                "valid": False,
-                "status": "INVALID_KEY",
-                "message": "API Key is invalid or malformed. Verify your key in Google AI Studio.",
-            }
-        else:
-            return {
-                "valid": False,
-                "status": "ERROR",
-                "message": f"Verification failed: {err_msg[:160]}",
-            }
+    return {
+        "valid": False,
+        "status": "ERROR",
+        "message": f"Verification failed: {last_err[:160]}",
+    }
