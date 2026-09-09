@@ -154,21 +154,16 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (savedKey) headers["x-gemini-api-key"] = savedKey;
 
-      let lat = selectedCoord ? selectedCoord.lat : undefined;
-      let lon = selectedCoord ? selectedCoord.lon : undefined;
-      const coast = selectedCoastId || "all_india";
-      if ((!lat || !lon) && coast !== "all_india") {
-        const found = INDIAN_COASTS.find((c) => c.id === coast);
-        if (found) {
-          lat = found.latitude;
-          lon = found.longitude;
-        }
-      }
+      // Only pass coordinates if explicitly clicked/pinned on the map
+      const lat = selectedCoord ? selectedCoord.lat : undefined;
+      const lon = selectedCoord ? selectedCoord.lon : undefined;
+      // Do NOT synthesize coordinates or force Konkan; keep query location neutral
+      const coast = selectedCoastId && selectedCoastId !== "konkan" ? selectedCoastId : undefined;
 
       const bodyPayload: any = {
         query: queryText,
         language: activeLang.code,
-        location: { latitude: lat, longitude: lon, coast_id: coast },
+        location: lat && lon ? { latitude: lat, longitude: lon, coast_id: coast } : undefined,
         coast_id: coast
       };
 
@@ -254,16 +249,9 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     // Resolve active recognition speechLang:
     let targetSpeechLang = selectedLanguage.speechLang;
     if (selectedLanguage.code === "auto" || isAutoDetect) {
-      const coast = (selectedCoastId || "").toLowerCase();
-      if (coast.includes("malabar") || coast.includes("kerala")) targetSpeechLang = "ml-IN";
-      else if (coast.includes("coromandel") || coast.includes("tamil")) targetSpeechLang = "ta-IN";
-      else if (coast.includes("circars") || coast.includes("andhra")) targetSpeechLang = "te-IN";
-      else if (coast.includes("canara") || coast.includes("karnataka")) targetSpeechLang = "kn-IN";
-      else if (coast.includes("konkan") || coast.includes("maharashtra")) targetSpeechLang = "mr-IN";
-      else if (coast.includes("saurashtra") || coast.includes("gujarat")) targetSpeechLang = "gu-IN";
-      else if (coast.includes("utkal") || coast.includes("odisha")) targetSpeechLang = "or-IN";
-      else if (coast.includes("bengal") || coast.includes("sundarban")) targetSpeechLang = "bn-IN";
-      else targetSpeechLang = "en-IN";
+      // In auto mode, use neutral en-IN (Indian English) which transcribes both English and transliterated Indic words
+      // Zero bias toward any single regional state
+      targetSpeechLang = "en-IN";
     }
 
     recognition.lang = targetSpeechLang;
@@ -591,13 +579,25 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
               <div className="mt-3 text-center">
                 <div className="text-xs font-bold font-mono tracking-widest uppercase text-cyan-100">
                   {isListening
-                    ? `🎙 LISTENING IN ${selectedLanguage.name.toUpperCase()}...`
+                    ? (isAutoDetect || selectedLanguage.code === "auto"
+                        ? "🎙 LISTENING (AUTO-DETECT ACTIVE — SPEAK OR SELECT LANGUAGE)..."
+                        : `🎙 LISTENING IN ${selectedLanguage.flag} ${selectedLanguage.name.toUpperCase()} (${selectedLanguage.speechLang})...`)
                     : isThinking
-                    ? "⚡ NEREUS IS ANALYZING OCEAN METRICS..."
+                    ? "⚡ NEREUS IS RESEARCHING LIVE REGIONAL METRICS..."
                     : isSpeaking
-                    ? `🔊 NEREUS IS SPEAKING IN ${selectedLanguage.nativeName.toUpperCase()}...`
-                    : `TAP MIC TO SPEAK IN ${selectedLanguage.nativeName}`}
+                    ? `🔊 NEREUS IS SPEAKING IN ${selectedLanguage.flag} ${selectedLanguage.nativeName.toUpperCase()}...`
+                    : isAutoDetect
+                    ? "TAP MIC TO SPEAK (AUTO LANGUAGE DETECT)"
+                    : `TAP MIC TO SPEAK IN ${selectedLanguage.flag} ${selectedLanguage.nativeName}`}
                 </div>
+                {detectedLanguage && isAutoDetect && (
+                  <div className="text-[11px] font-mono text-teal-300 mt-1 flex items-center justify-center gap-1.5 font-bold animate-pulse">
+                    <span>🌐 Detected Language:</span>
+                    <span className="px-2 py-0.5 rounded bg-teal-950/80 border border-teal-400/40 text-teal-200">
+                      {detectedLanguage.flag} {detectedLanguage.name} ({detectedLanguage.nativeName})
+                    </span>
+                  </div>
+                )}
                 {interimText && (
                   <div className="text-xs font-mono text-amber-300 mt-1 italic animate-pulse">
                     "{interimText}"

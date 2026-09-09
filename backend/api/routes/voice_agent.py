@@ -69,7 +69,7 @@ def detect_language(text: str) -> str:
     Intelligently detects Indian language from Unicode scripts and coastal lexical markers.
     Supports Hindi, Tamil, Telugu, Kannada, Malayalam, Marathi, Bengali, Gujarati, Odia, English.
     """
-    if not text:
+    if not text or not text.strip():
         return "en"
 
     deval_count = 0
@@ -92,32 +92,88 @@ def detect_language(text: str) -> str:
         if 0x0900 <= cp <= 0x097F:
             deval_count += 1
 
+    # Devanagari script: accurately separate Marathi from Hindi
     if deval_count > 0:
+        if any(c in text for c in ["\u0933", "\u0931"]):  # ळ, ऱ
+            return "mr"
         lower = text.lower()
-        if any(w in lower for w in ["आहे", "नाही", "काय", "कसा", "कशी", "लाटा", "मासे", "किनारपट्टी"]):
+        marathi_markers = [
+            "आहे", "नाही", "काय", "कसा", "कशी", "कसे", "लाटा", "मासेमारी", "मासे",
+            "किनारपट्टी", "धोक्याची", "चेतावणी", "उद्या", "वारा", "सांगा", "करू", "शकतो", "का", "वादळ"
+        ]
+        if any(w in lower for w in marathi_markers):
             return "mr"
         return "hi"
 
-    # Romanized transliterated coastal queries across all 10 languages
+    # Romanized transliteration heuristics for coastal queries
     lower = text.lower()
-    if any(w in lower for w in ["eppadi", "irukku", "vanilai", "alai", "kadal", "katru", "meen", "nalaikku", "chellalama", "enna", "irukiradhu", "kadaloora"]):
+
+    # Distinctive regional coastal phrases first (linguistic tokens only, NO city names)
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "eppadi", "irukku", "irukkirathu", "vanilai", "alavugal", "alai", "kadal",
+        "meen", "meenpidi", "katru", "kaathu", "nalaikku", "chellalama", "pogalama",
+        "enna", "kadalooram"
+    ]):
         return "ta"
-    if any(w in lower for w in ["ela undi", "ela vundi", "vatavaranam", "samudram", "chepalu", "vepa", "tupanu", "repati", "roju", "alalu", "gali", "kadali"]):
+
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "ela undi", "ela vundi", "vatavaranam", "samudram", "chepalu", "chepala",
+        "alalu", "gaali", "repu", "repati", "tupanu", "vellavacha", "velloccha"
+    ]):
         return "te"
-    if any(w in lower for w in ["enganeyundu", "engane undu", "kaalavastha", "thiramala", "meenpidutham", "kadalil", "pokaamo", "kaattu", "surakshitham", "nale"]):
+
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "enganeyundu", "engane undu", "kaalavastha", "kadalil", "thiramala",
+        "meenpidutham", "pokaamo", "pokamo", "kaattu", "kattu", "surakshitham",
+        "nale"
+    ]):
         return "ml"
-    if any(w in lower for w in ["hegide", "hege ide", "havamana", "samudra", "meenu", "alegalu", "gali", "naale", "surakshitave"]):
+
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "hegide", "hege ide", "havamana", "meenugarike", "alegalu", "naale",
+        "surakshita", "karavali"
+    ]):
         return "kn"
-    if any(w in lower for w in ["kem chhe", "kevu chhe", "havaaman", "daryo", "mojan", "pavan", "machhimar", "kaale", "salaamat"]):
+
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "kem chhe", "kevu chhe", "havaaman", "daryo", "mojan", "pavan",
+        "machhimar", "kaale", "salaamat"
+    ]):
         return "gu"
-    if any(w in lower for w in ["kasa ahe", "kasa aahe", "havaman", "samudra", "lata", "mase", "udya", "surakshit"]):
-        return "mr"
-    if any(w in lower for w in ["kemon achhe", "kemon ache", "abohawa", "dheu", "batas", "machh", "shomudro", "kaal", "bhor"]):
+
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "kemon achhe", "kemon ache", "abohawa", "dheu", "batas", "machh",
+        "shomudro", "jawa jabe", "kal shokale"
+    ]):
         return "bn"
-    if any(w in lower for w in ["kemiti achhi", "kemiti achi", "panipaga", "dheu", "samudra", "machhadhara", "kali", "nirapada"]):
+
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "kemiti achhi", "kemiti achi", "panipaga", "machhadhara", "kali",
+        "nirapada"
+    ]):
         return "or"
-    if any(w in lower for w in ["kaisa", "kaise", "kya", "mausam", "machli", "toofan", "samundar", "leher", "hawa", "surakshit", "pani"]):
+
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "kasa ahe", "kashi ahe", "havaman", "lata", "vara", "udya",
+        "masemari", "jaavu shakto", "kinarpatti"
+    ]):
+        return "mr"
+
+    # Strict multi-word or unambiguous Hindi coastal phrases (do NOT match isolated 'kya' or 'hai')
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "kaisa hai", "kaise hai", "kya mausam", "mausam kaisa", "machli pakadna",
+        "machli pakadne", "samundar me", "lahrein", "pani kaisa", "toofan ka",
+        "ja sakte hai", "surakshit hai", "kaisa mausam rahega"
+    ]):
         return "hi"
+
+    # English marine keywords
+    if any(re.search(rf"\b{re.escape(w)}\b", lower) for w in [
+        "weather", "wave", "wind", "cyclone", "safe", "safety", "fishing",
+        "fish", "sea", "ocean", "port", "harbor", "temperature", "swell",
+        "tomorrow", "today", "forecast", "tide", "height", "speed"
+    ]):
+        return "en"
 
     return "en"
 

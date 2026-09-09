@@ -572,93 +572,52 @@ def detect_region_from_text(
 ) -> Dict[str, Any]:
     """
     Intelligently extracts the coastal station or region from query.
-    Rules:
-    1. Direct station/city/port/region alias match across English + 10 Indic scripts.
-    2. Client active coordinates lookup (if user has an active map location or selected coast).
-    3. Client active coast_id lookup (e.g. 'coromandel', 'malabar', 'konkan', 'canara', 'utkal', etc.).
-    4. Language code regional hub fallback (e.g. Tamil -> Chennai, Malayalam -> Kochi, Telugu -> Vizag).
-    5. If completely unspecified: Returns neutral All-India Maritime Zone (NO Maharashtra bias).
+    Hierarchy:
+    1. Direct place name / port / district alias match in query text (highest priority).
+    2. Coastal state or regional sea corridor match in query text (e.g. Kerala, Tamil Nadu, Andhra, etc.).
+    3. Indic Unicode script detection in query text (e.g. Tamil -> Chennai, Malayalam -> Kochi, etc.).
+    4. Language code regional hub routing (e.g. ta -> Chennai, ml -> Kochi, te -> Vizag, etc.).
+    5. Client active coast_id (ONLY IF explicitly set and not default 'konkan' or 'all_india').
+    6. Explicit client coordinates (ONLY IF passed and not default Mumbai coordinates).
+    7. Neutral National Maritime Zone (EEZ) — zero Konkan / Maharashtra bias.
     """
-    lower_q = query.lower()
+    lower_q = query.lower().strip()
 
-    # 1. Direct place name alias search across all 35+ stations
+    # 1. Direct place name alias search across all 35+ stations (longest matching alias first)
+    best_region = None
+    best_len = 0
     for region in COASTAL_REGIONS:
         for alias in region.get("names", []):
-            # Use word boundary or exact match
-            if alias in lower_q:
-                return region
+            al_lower = alias.lower()
+            if re.search(rf"\b{re.escape(al_lower)}\b", lower_q) or (len(al_lower) >= 4 and al_lower in lower_q):
+                if len(al_lower) > best_len:
+                    best_len = len(al_lower)
+                    best_region = region
 
-    # 2. Client explicit coordinates (e.g. user clicked a map pin or selected a coast)
-    if fallback_lat is not None and fallback_lon is not None:
-        closest = min(
-            COASTAL_REGIONS,
-            key=lambda r: (r["lat"] - fallback_lat) ** 2 + (r["lon"] - fallback_lon) ** 2
-        )
-        return closest
+    if best_region:
+        return best_region
 
-    # 3. Client active coast_id (e.g. 'malabar' -> Kochi, 'coromandel' -> Chennai, etc.)
-    if coast_id:
-        c_lower = coast_id.lower()
-        if any(w in c_lower for w in ["malabar", "kerala"]):
+    # 2. Coastal State or Corridor mention in user query
+    state_corridor_map = [
+        (["kerala", "malabar", "travancore"], "kochi"),
+        (["tamil nadu", "tamilnadu", "coromandel", "tamil"], "chennai"),
+        (["andhra", "andhra pradesh", "circars", "telugu"], "visakhapatnam"),
+        (["karnataka", "canara", "kanara", "kannada"], "mangalore"),
+        (["gujarat", "saurashtra", "kutch", "kathiawar", "gujarati"], "porbandar"),
+        (["odisha", "orissa", "utkal", "odia"], "paradip"),
+        (["west bengal", "bengal", "sundarban", "bengali"], "digha"),
+        (["goa", "konkani"], "mormugao"),
+        (["andaman", "nicobar", "port blair"], "port_blair"),
+        (["lakshadweep"], "kavaratti"),
+        (["maharashtra", "konkan", "marathi"], "mumbai"),
+    ]
+    for keywords, target_id in state_corridor_map:
+        if any(re.search(rf"\b{re.escape(k)}\b", lower_q) for k in keywords):
             for r in COASTAL_REGIONS:
-                if r["id"] == "kochi": return r
-        elif any(w in c_lower for w in ["coromandel", "tamil"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "chennai": return r
-        elif any(w in c_lower for w in ["andhra", "circars"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "visakhapatnam": return r
-        elif any(w in c_lower for w in ["canara", "karnataka"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "mangalore": return r
-        elif any(w in c_lower for w in ["konkan", "maharashtra"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "mumbai": return r
-        elif any(w in c_lower for w in ["saurashtra", "gujarat", "kutch"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "porbandar": return r
-        elif any(w in c_lower for w in ["utkal", "odisha"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "paradip": return r
-        elif any(w in c_lower for w in ["bengal", "sundarban"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "digha": return r
-        elif "andaman" in c_lower:
-            for r in COASTAL_REGIONS:
-                if r["id"] == "port_blair": return r
-        elif "lakshadweep" in c_lower:
-            for r in COASTAL_REGIONS:
-                if r["id"] == "kavaratti": return r
+                if r["id"] == target_id:
+                    return r
 
-    # 4. Language code fallback (if user asked in a regional language, route to that region!)
-    if lang_code and lang_code not in ("en", "auto"):
-        clean_code = lang_code.lower()[:2]
-        if clean_code == "ta":
-            for r in COASTAL_REGIONS:
-                if r["id"] == "chennai": return r
-        elif clean_code == "ml":
-            for r in COASTAL_REGIONS:
-                if r["id"] == "kochi": return r
-        elif clean_code == "te":
-            for r in COASTAL_REGIONS:
-                if r["id"] == "visakhapatnam": return r
-        elif clean_code == "kn":
-            for r in COASTAL_REGIONS:
-                if r["id"] == "mangalore": return r
-        elif clean_code == "gu":
-            for r in COASTAL_REGIONS:
-                if r["id"] == "porbandar": return r
-        elif clean_code == "bn":
-            for r in COASTAL_REGIONS:
-                if r["id"] == "digha": return r
-        elif clean_code == "or":
-            for r in COASTAL_REGIONS:
-                if r["id"] == "paradip": return r
-        elif clean_code == "mr":
-            for r in COASTAL_REGIONS:
-                if r["id"] == "mumbai": return r
-
-    # 5. Indic Unicode script detection in query text (e.g. Malayalam characters -> Kochi, Tamil -> Chennai)
+    # 3. Indic Unicode script detection in query text (e.g. Malayalam -> Kochi, Tamil -> Chennai)
     for ch in query:
         cp = ord(ch)
         if 0x0D00 <= cp <= 0x0D7F:  # Malayalam
@@ -683,7 +642,82 @@ def detect_region_from_text(
             for r in COASTAL_REGIONS:
                 if r["id"] == "paradip": return r
 
-    # 6. Neutral National Fallback
+    # Devanagari script: check if specifically Marathi
+    if any(0x0900 <= ord(ch) <= 0x097F for ch in query):
+        if any(c in query for c in ["\u0933", "\u0931"]):  # ळ, ऱ
+            for r in COASTAL_REGIONS:
+                if r["id"] == "mumbai": return r
+        marathi_words = [
+            "आहे", "नाही", "काय", "कसा", "कशी", "कसे", "लाटा", "मासेमारी", "मासे",
+            "किनारपट्टी", "धोक्याची", "चेतावणी", "उद्या", "वारा", "सांगा", "करू", "शकतो", "का", "वादळ"
+        ]
+        if any(w in lower_q for w in marathi_words):
+            for r in COASTAL_REGIONS:
+                if r["id"] == "mumbai": return r
+        # Generic Hindi query with no place names will fall through to All-India National Maritime Zone
+
+    # 4. Language code fallback (if user asked in a regional language, route to that region!)
+    if lang_code and lang_code not in ("en", "auto", "hi"):
+        clean_code = lang_code.lower()[:2]
+        lang_to_hub = {
+            "ta": "chennai",
+            "ml": "kochi",
+            "te": "visakhapatnam",
+            "kn": "mangalore",
+            "gu": "porbandar",
+            "bn": "digha",
+            "or": "paradip",
+            "mr": "mumbai",
+        }
+        target_id = lang_to_hub.get(clean_code)
+        if target_id:
+            for r in COASTAL_REGIONS:
+                if r["id"] == target_id:
+                    return r
+
+    # 5. Client active coast_id (e.g. 'malabar' -> Kochi, 'coromandel' -> Chennai, etc.)
+    # IGNORE default 'konkan' or 'all_india' so it doesn't hijack general questions
+    if coast_id and coast_id.lower() not in ("all_india", "konkan", ""):
+        c_lower = coast_id.lower()
+        if any(w in c_lower for w in ["malabar", "kerala"]):
+            for r in COASTAL_REGIONS:
+                if r["id"] == "kochi": return r
+        elif any(w in c_lower for w in ["coromandel", "tamil"]):
+            for r in COASTAL_REGIONS:
+                if r["id"] == "chennai": return r
+        elif any(w in c_lower for w in ["andhra", "circars"]):
+            for r in COASTAL_REGIONS:
+                if r["id"] == "visakhapatnam": return r
+        elif any(w in c_lower for w in ["canara", "karnataka"]):
+            for r in COASTAL_REGIONS:
+                if r["id"] == "mangalore": return r
+        elif any(w in c_lower for w in ["saurashtra", "gujarat", "kutch"]):
+            for r in COASTAL_REGIONS:
+                if r["id"] == "porbandar": return r
+        elif any(w in c_lower for w in ["utkal", "odisha"]):
+            for r in COASTAL_REGIONS:
+                if r["id"] == "paradip": return r
+        elif any(w in c_lower for w in ["bengal", "sundarban"]):
+            for r in COASTAL_REGIONS:
+                if r["id"] == "digha": return r
+        elif "andaman" in c_lower:
+            for r in COASTAL_REGIONS:
+                if r["id"] == "port_blair": return r
+        elif "lakshadweep" in c_lower:
+            for r in COASTAL_REGIONS:
+                if r["id"] == "kavaratti": return r
+
+    # 6. Client explicit coordinates (only if not synthetic Mumbai default coords 18.922, 72.834)
+    if fallback_lat is not None and fallback_lon is not None:
+        is_default_konkan = (abs(fallback_lat - 18.922) < 0.05 and abs(fallback_lon - 72.834) < 0.05 and coast_id == "konkan")
+        if not is_default_konkan:
+            closest = min(
+                COASTAL_REGIONS,
+                key=lambda r: (r["lat"] - fallback_lat) ** 2 + (r["lon"] - fallback_lon) ** 2
+            )
+            return closest
+
+    # 7. Neutral All-India Maritime Zone (NO Maharashtra / Konkan bias)
     return NATIONAL_MARITIME_ZONE
 
 
@@ -956,6 +990,9 @@ INTENT_TEMPLATES = {
         "weather_telemetry": "{region} ଉପକୂଳ ପାଣିପାଗ: ଢେଉର ଉଚ୍ଚତା {wave} ମିଟର, ପବନର ବେଗ {wind} କିମି/ଘଣ୍ଟା, ତାପମାତ୍ରା {temp}°C। [VERDICT: {verdict}]"
     }
 }
+
+# Alias for backward compatibility with explanation agent
+REGIONAL_TEMPLATES = INTENT_TEMPLATES
 
 
 def synthesize_dynamic_advisory(research: Dict[str, Any], lang: str = "en", query: str = "") -> str:
