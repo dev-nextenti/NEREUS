@@ -98,23 +98,25 @@ def detect_language(text: str) -> str:
             return "mr"
         return "hi"
 
-    # Romanized transliterated coastal queries
+    # Romanized transliterated coastal queries across all 10 languages
     lower = text.lower()
-    if any(w in lower for w in ["eppadi", "irukku", "kadal", "meen", "aligal", "nalaikku"]):
+    if any(w in lower for w in ["eppadi", "irukku", "vanilai", "alai", "kadal", "katru", "meen", "nalaikku", "chellalama", "enna", "irukiradhu", "kadaloora"]):
         return "ta"
-    if any(w in lower for w in ["ela undi", "samudram", "chepalu", "alalu", "repu"]):
+    if any(w in lower for w in ["ela undi", "ela vundi", "vatavaranam", "samudram", "chepalu", "vepa", "tupanu", "repati", "roju", "alalu", "gali", "kadali"]):
         return "te"
-    if any(w in lower for w in ["enganeyundu", "kadalu", "thiramala", "meenpiditham", "nale"]):
+    if any(w in lower for w in ["enganeyundu", "engane undu", "kaalavastha", "thiramala", "meenpidutham", "kadalil", "pokaamo", "kaattu", "surakshitham", "nale"]):
         return "ml"
-    if any(w in lower for w in ["hegide", "samudra", "meenu", "alegal", "naale"]):
+    if any(w in lower for w in ["hegide", "hege ide", "havamana", "samudra", "meenu", "alegalu", "gali", "naale", "surakshitave"]):
         return "kn"
-    if any(w in lower for w in ["kem chhe", "daryo", "mojan", "pavan", "kaale"]):
+    if any(w in lower for w in ["kem chhe", "kevu chhe", "havaaman", "daryo", "mojan", "pavan", "machhimar", "kaale", "salaamat"]):
         return "gu"
-    if any(w in lower for w in ["kasa ahe", "samudra", "lata", "mase", "udya"]):
+    if any(w in lower for w in ["kasa ahe", "kasa aahe", "havaman", "samudra", "lata", "mase", "udya", "surakshit"]):
         return "mr"
-    if any(w in lower for w in ["kemon achhe", "dheu", "batas", "machh"]):
+    if any(w in lower for w in ["kemon achhe", "kemon ache", "abohawa", "dheu", "batas", "machh", "shomudro", "kaal", "bhor"]):
         return "bn"
-    if any(w in lower for w in ["kaise", "kaisa", "machli", "mausam", "toofan"]):
+    if any(w in lower for w in ["kemiti achhi", "kemiti achi", "panipaga", "dheu", "samudra", "machhadhara", "kali", "nirapada"]):
+        return "or"
+    if any(w in lower for w in ["kaisa", "kaise", "kya", "mausam", "machli", "toofan", "samundar", "leher", "hawa", "surakshit", "pani"]):
         return "hi"
 
     return "en"
@@ -161,6 +163,7 @@ class VoiceQueryRequest(BaseModel):
     language: Optional[str] = "auto"
     location: Optional[Dict[str, Any]] = None
     api_key: Optional[str] = None
+    coast_id: Optional[str] = None
 
 
 @router.post("/api/voice-agent/query")
@@ -186,22 +189,30 @@ async def handle_voice_query(
     # 1. Perform Real-Time Online Regional Research (parallel, 8s cap)
     lat = req.location.get("lat") or req.location.get("latitude") if req.location else None
     lon = req.location.get("lon") or req.location.get("longitude") if req.location else None
+    coast_id = req.coast_id or (req.location.get("coast_id") if req.location else None)
 
     loop = asyncio.get_event_loop()
     try:
         research = await asyncio.wait_for(
             loop.run_in_executor(
                 None,
-                lambda: perform_online_research(query_text, client_lat=lat, client_lon=lon, lang_code=lang)
+                lambda: perform_online_research(
+                    query_text,
+                    client_lat=lat,
+                    client_lon=lon,
+                    lang_code=lang,
+                    coast_id=coast_id
+                )
             ),
             timeout=9.0
         )
     except asyncio.TimeoutError:
         research = {
-            "region": {"primary_name": "Maharashtra Coast (Mumbai / Konkan)", "sea": "Arabian Sea", "state": "Maharashtra"},
+            "intent": "weather_telemetry",
+            "region": {"primary_name": "Indian Coastal Waters", "sea": "Indian Ocean", "state": "All India"},
             "telemetry": {
-                "wave_height_m": 1.4, "swell_height_m": 0.9,
-                "wind_speed_kmh": 16.0, "wind_direction_deg": 240,
+                "wave_height_m": 1.2, "swell_height_m": 0.8,
+                "wind_speed_kmh": 16.0, "wind_direction_deg": 220,
                 "temperature_c": 28.5, "humidity_pct": 72,
                 "weather_code": 1, "weather_desc": "Mainly Clear",
                 "safety_verdict": "SAFE"
@@ -244,9 +255,9 @@ async def handle_voice_query(
             print(f"[VoiceAgent] Gemini notice ({type(e).__name__}); using live research synthesizer.")
             reply_text = ""
 
-    # 3. Dynamic advisory synthesizer with real live regional metrics
+    # 3. Dynamic advisory synthesizer with real live regional metrics and intent understanding
     if not reply_text:
-        reply_text = synthesize_dynamic_advisory(research, lang)
+        reply_text = synthesize_dynamic_advisory(research, lang, query=query_text)
 
     # Determine safety verdict
     verdict = telemetry.get("safety_verdict", "SAFE")

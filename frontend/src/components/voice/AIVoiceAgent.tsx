@@ -25,6 +25,7 @@ import {
   getLanguageByCode,
   detectLanguageFromText
 } from "../../lib/languages";
+import { INDIAN_COASTS } from "../../lib/indianCoasts";
 
 interface Transcript {
   id: string;
@@ -153,13 +154,23 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (savedKey) headers["x-gemini-api-key"] = savedKey;
 
+      let lat = selectedCoord ? selectedCoord.lat : undefined;
+      let lon = selectedCoord ? selectedCoord.lon : undefined;
+      const coast = selectedCoastId || "all_india";
+      if ((!lat || !lon) && coast !== "all_india") {
+        const found = INDIAN_COASTS.find((c) => c.id === coast);
+        if (found) {
+          lat = found.latitude;
+          lon = found.longitude;
+        }
+      }
+
       const bodyPayload: any = {
         query: queryText,
-        language: activeLang.code
+        language: activeLang.code,
+        location: { latitude: lat, longitude: lon, coast_id: coast },
+        coast_id: coast
       };
-      if (selectedCoord) {
-        bodyPayload.location = { latitude: selectedCoord.lat, longitude: selectedCoord.lon };
-      }
 
       const resp = await fetch("/api/voice-agent/query", {
         method: "POST",
@@ -240,7 +251,22 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
 
-    recognition.lang = selectedLanguage.speechLang;
+    // Resolve active recognition speechLang:
+    let targetSpeechLang = selectedLanguage.speechLang;
+    if (selectedLanguage.code === "auto" || isAutoDetect) {
+      const coast = (selectedCoastId || "").toLowerCase();
+      if (coast.includes("malabar") || coast.includes("kerala")) targetSpeechLang = "ml-IN";
+      else if (coast.includes("coromandel") || coast.includes("tamil")) targetSpeechLang = "ta-IN";
+      else if (coast.includes("circars") || coast.includes("andhra")) targetSpeechLang = "te-IN";
+      else if (coast.includes("canara") || coast.includes("karnataka")) targetSpeechLang = "kn-IN";
+      else if (coast.includes("konkan") || coast.includes("maharashtra")) targetSpeechLang = "mr-IN";
+      else if (coast.includes("saurashtra") || coast.includes("gujarat")) targetSpeechLang = "gu-IN";
+      else if (coast.includes("utkal") || coast.includes("odisha")) targetSpeechLang = "or-IN";
+      else if (coast.includes("bengal") || coast.includes("sundarban")) targetSpeechLang = "bn-IN";
+      else targetSpeechLang = "en-IN";
+    }
+
+    recognition.lang = targetSpeechLang;
     recognition.continuous = false;
     recognition.interimResults = true;
 
@@ -499,6 +525,42 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
                     : "border-cyan-400/15 scale-100"
                 }`}
               />
+
+              {/* Quick Language Switcher Bar */}
+              <div className="relative z-20 flex items-center gap-1.5 overflow-x-auto py-1 px-3 max-w-full justify-start md:justify-center mb-2.5 scrollbar-none">
+                <button
+                  onClick={() => {
+                    setSelectedLanguage(AUTO_LANGUAGE);
+                    setIsAutoDetect(true);
+                    stopListening();
+                  }}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold transition-all border cursor-pointer shrink-0 ${
+                    selectedLanguage.code === "auto" || isAutoDetect
+                      ? "bg-cyan-500/30 text-cyan-200 border-cyan-400 shadow-[0_0_10px_rgba(0,212,255,0.4)] scale-105"
+                      : "bg-slate-900/60 text-slate-400 border-slate-700 hover:text-white"
+                  }`}
+                  title="Automatic Language Detection"
+                >
+                  🌐 AUTO
+                </button>
+                {BUILTIN_LANGUAGES.map((lang) => (
+                  <button
+                    key={lang.code}
+                    onClick={() => {
+                      setSelectedLanguage(lang);
+                      setIsAutoDetect(false);
+                      stopListening();
+                    }}
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold transition-all border cursor-pointer shrink-0 ${
+                      selectedLanguage.code === lang.code && !isAutoDetect
+                        ? "bg-cyan-500/30 text-cyan-200 border-cyan-400 shadow-[0_0_10px_rgba(0,212,255,0.4)] scale-105"
+                        : "bg-slate-900/60 text-slate-400 border-slate-700 hover:text-white"
+                    }`}
+                  >
+                    {lang.flag} {lang.nativeName.split(" ")[0]}
+                  </button>
+                ))}
+              </div>
 
               {/* Central Glowing Mic Button */}
               <button

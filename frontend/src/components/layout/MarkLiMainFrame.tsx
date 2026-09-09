@@ -115,6 +115,38 @@ export const MarkLiMainFrame: React.FC<MarkLiMainFrameProps> = ({
     }));
   }, [coastalStations, isOffline]);
 
+  // ── Coastal Conditions Matrix: Harsh / Moderate / Safe ──────────────────────
+  const [conditionsFilter, setConditionsFilter] = useState<"ALL" | "HARSH" | "MODERATE" | "SAFE">("ALL");
+
+  const categorizedStations = useMemo(() => {
+    const harsh: CoastalStation[] = [];
+    const moderate: CoastalStation[] = [];
+    const safe: CoastalStation[] = [];
+
+    stationsData.forEach((st) => {
+      if (st.wave_height_m >= 1.8 || st.wind_speed_kmh >= 28.0 || st.safety_verdict === "DANGER") {
+        harsh.push(st);
+      } else if (
+        st.wave_height_m >= 1.1 ||
+        st.wind_speed_kmh >= 16.0 ||
+        st.safety_verdict === "CAUTION"
+      ) {
+        moderate.push(st);
+      } else {
+        safe.push(st);
+      }
+    });
+
+    return { harsh, moderate, safe };
+  }, [stationsData]);
+
+  const filteredMatrixStations = useMemo(() => {
+    if (conditionsFilter === "HARSH") return categorizedStations.harsh;
+    if (conditionsFilter === "MODERATE") return categorizedStations.moderate;
+    if (conditionsFilter === "SAFE") return categorizedStations.safe;
+    return stationsData;
+  }, [conditionsFilter, categorizedStations, stationsData]);
+
   // ── Telemetry Clock & System States ─────────────────────────────────────────
   const [clockStr, setClockStr] = useState("00:00:00");
   const [dateStr, setDateStr] = useState("");
@@ -839,19 +871,127 @@ export const MarkLiMainFrame: React.FC<MarkLiMainFrameProps> = ({
             </div>
           </div>
 
-          {/* Mark-LI File / Bathymetry Drop Zone (_build_right_panel dropzone) */}
-          <div
-            className="p-3.5 rounded border border-dashed text-center flex flex-col items-center justify-center gap-1.5 transition-all cursor-pointer hover:border-cyan-400"
-            style={{ background: C.PANEL2, borderColor: C.BORDER_B }}
-            onClick={() => onSendMessage("Explain latest bathymetric chart and seafloor contour data for Indian coasts")}
-          >
-            <Upload className="w-5 h-5" style={{ color: C.PRI }} />
-            <span className="text-[10px] font-bold" style={{ color: C.TEXT }}>
-              SONAR / BATHYMETRY DROP
-            </span>
-            <span className="text-[8px]" style={{ color: C.TEXT_DIM }}>
-              Drop GPX, SONAR, or Satellite imagery to analyze
-            </span>
+          {/* ─── COASTAL CONDITIONS MATRIX: HARSH / MODERATE / SAFE (Live Triage) ─── */}
+          <div className="space-y-2 flex-1 flex flex-col min-h-0 pt-1 border-t" style={{ borderColor: C.BORDER }}>
+            <div className="flex items-center justify-between text-[10px] font-bold" style={{ color: C.TEXT_MED }}>
+              <div className="flex items-center gap-1.5" style={{ color: C.PRI }}>
+                <Shield className="w-3.5 h-3.5 text-cyan-400" />
+                <span>LIVE CONDITIONS MATRIX</span>
+              </div>
+              <span className="text-[9px] font-mono" style={{ color: C.GREEN }}>
+                {stationsData.length} Stations
+              </span>
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="grid grid-cols-4 gap-1 text-[9px] font-bold font-mono">
+              <button
+                onClick={() => setConditionsFilter("ALL")}
+                className={`py-1 rounded border text-center transition-all cursor-pointer ${
+                  conditionsFilter === "ALL"
+                    ? "bg-cyan-950/90 border-cyan-400 text-cyan-200 shadow-[0_0_8px_rgba(0,212,255,0.3)]"
+                    : "bg-black/40 border-slate-800 text-slate-400 hover:text-white"
+                }`}
+              >
+                ALL ({stationsData.length})
+              </button>
+              <button
+                onClick={() => setConditionsFilter("HARSH")}
+                className={`py-1 rounded border text-center transition-all cursor-pointer ${
+                  conditionsFilter === "HARSH"
+                    ? "bg-red-950/90 border-red-400 text-red-300 shadow-[0_0_8px_rgba(255,51,85,0.4)]"
+                    : "bg-black/40 border-slate-800 text-red-400/80 hover:text-red-300"
+                }`}
+                title="Harsh Conditions: High swell or gale force winds"
+              >
+                🔴 HARSH ({categorizedStations.harsh.length})
+              </button>
+              <button
+                onClick={() => setConditionsFilter("MODERATE")}
+                className={`py-1 rounded border text-center transition-all cursor-pointer ${
+                  conditionsFilter === "MODERATE"
+                    ? "bg-amber-950/90 border-amber-400 text-amber-300 shadow-[0_0_8px_rgba(255,204,0,0.4)]"
+                    : "bg-black/40 border-slate-800 text-amber-400/80 hover:text-amber-300"
+                }`}
+                title="Moderate Conditions: Moderate chop, small craft advisory"
+              >
+                🟡 MOD ({categorizedStations.moderate.length})
+              </button>
+              <button
+                onClick={() => setConditionsFilter("SAFE")}
+                className={`py-1 rounded border text-center transition-all cursor-pointer ${
+                  conditionsFilter === "SAFE"
+                    ? "bg-emerald-950/90 border-emerald-400 text-emerald-300 shadow-[0_0_8px_rgba(0,255,136,0.4)]"
+                    : "bg-black/40 border-slate-800 text-emerald-400/80 hover:text-emerald-300"
+                }`}
+                title="Safe Conditions: Calm seas and light winds"
+              >
+                🟢 SAFE ({categorizedStations.safe.length})
+              </button>
+            </div>
+
+            {/* List of Stations */}
+            <div className="space-y-1.5 overflow-y-auto max-h-56 pr-1 scrollbar-thin">
+              {filteredMatrixStations.length === 0 ? (
+                <div className="p-3 text-center text-[10px] text-slate-500 font-mono border rounded" style={{ borderColor: C.BORDER }}>
+                  No stations in this category currently.
+                </div>
+              ) : (
+                filteredMatrixStations.map((st) => {
+                  const isHarsh = categorizedStations.harsh.some((h) => h.id === st.id);
+                  const isMod = categorizedStations.moderate.some((m) => m.id === st.id);
+                  const verdictColor = isHarsh ? C.RED : isMod ? C.ACC2 : C.GREEN;
+                  const verdictLabel = isHarsh ? "HARSH" : isMod ? "MODERATE" : "SAFE";
+                  const borderClass = isHarsh
+                    ? "border-red-900/60 bg-red-950/25 hover:border-red-400"
+                    : isMod
+                    ? "border-amber-900/60 bg-amber-950/25 hover:border-amber-400"
+                    : "border-emerald-900/50 bg-emerald-950/20 hover:border-emerald-400";
+
+                  return (
+                    <div
+                      key={st.id}
+                      onClick={() => {
+                        onPinpointLocation(st.latitude, st.longitude, st.name);
+                        onSelectCoast(st.id);
+                        soundEffects.playButtonClick();
+                      }}
+                      className={`p-2 rounded border transition-all cursor-pointer ${borderClass}`}
+                      title={`Click to focus ${st.name} on 4K map`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[11px] font-bold text-white line-clamp-1">
+                          {st.name}
+                        </span>
+                        <span
+                          className="text-[8px] font-bold px-1.5 py-0.5 rounded tracking-wider shrink-0"
+                          style={{
+                            background: isHarsh
+                              ? "rgba(255,51,85,0.2)"
+                              : isMod
+                              ? "rgba(255,204,0,0.2)"
+                              : "rgba(0,255,136,0.2)",
+                            color: verdictColor,
+                            border: `1px solid ${verdictColor}`,
+                          }}
+                        >
+                          {verdictLabel}
+                        </span>
+                      </div>
+
+                      <div className="text-[9px] flex items-center justify-between" style={{ color: C.TEXT_DIM }}>
+                        <span className="line-clamp-1">{st.state} • {st.sea}</span>
+                        <div className="flex items-center gap-1.5 font-mono shrink-0 ml-1" style={{ color: C.WHITE }}>
+                          <span>🌊 {st.wave_height_m}m</span>
+                          <span>💨 {st.wind_speed_kmh}km/h</span>
+                          <span>🌡️ {st.temperature_c}°C</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
       </div>
