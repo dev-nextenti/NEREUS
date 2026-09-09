@@ -16,7 +16,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Mic, MicOff, Volume2, VolumeX, X, Radio, Sparkles,
-  Zap, AlertTriangle, Shield, Send, Check, RefreshCw, Activity, Waves
+  Zap, AlertTriangle, Shield, Send, Check, RefreshCw, Activity, Waves, MapPin
 } from "lucide-react";
 import {
   BUILTIN_LANGUAGES,
@@ -55,6 +55,7 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     () => initialLanguage || AUTO_LANGUAGE
   );
   const [detectedLanguage, setDetectedLanguage] = useState<VoiceLanguage | null>(null);
+  const [usePinLocation, setUsePinLocation] = useState(false);
 
   useEffect(() => {
     if (initialLanguage && initialLanguage.code !== "auto") {
@@ -154,17 +155,33 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (savedKey) headers["x-gemini-api-key"] = savedKey;
 
-      // Only pass coordinates if explicitly clicked/pinned on the map
-      const lat = selectedCoord ? selectedCoord.lat : undefined;
-      const lon = selectedCoord ? selectedCoord.lon : undefined;
-      // Do NOT synthesize coordinates or force Konkan; keep query location neutral
-      const coast = selectedCoastId && selectedCoastId !== "konkan" ? selectedCoastId : undefined;
+      // Proximity intent detection: only attach coordinates if user asks about "here", "my location", "this pin", etc.
+      // or if the user explicitly clicked the pin location toggle in the voice modal
+      const lowerQ = queryText.toLowerCase();
+      const proximityKeywords = [
+        "here", "my location", "this location", "current location", "my pin", "this pin",
+        "nearby", "around me", "local", "where i am",
+        "यहाँ", "इस जगह", "मेरे स्थान", "पास में",
+        "ఇక్కడ", "నా లొకేషన్", "పిన్",
+        "இங்கு", "என் இடம்",
+        "ഇവിടെ", "എന്റെ സ്ഥലം",
+        "ಇಲ್ಲಿ", "ನನ್ನ ಸ್ಥಳ",
+        "इथे", "या ठिकाणी",
+        "এখানে", "আমার স্থান"
+      ];
+      const hasLocalIntent = usePinLocation || proximityKeywords.some((k) => lowerQ.includes(k));
+
+      // Only pass coordinates if user explicitly intended local proximity
+      const lat = hasLocalIntent && selectedCoord ? selectedCoord.lat : undefined;
+      const lon = hasLocalIntent && selectedCoord ? selectedCoord.lon : undefined;
+      const coast = hasLocalIntent && selectedCoastId && selectedCoastId !== "konkan" ? selectedCoastId : undefined;
 
       const bodyPayload: any = {
         query: queryText,
         language: activeLang.code,
-        location: lat && lon ? { latitude: lat, longitude: lon, coast_id: coast } : undefined,
-        coast_id: coast
+        location: lat && lon ? { latitude: lat, longitude: lon, coast_id: coast, pin_focused: hasLocalIntent } : undefined,
+        coast_id: coast,
+        pin_focused: hasLocalIntent
       };
 
       const resp = await fetch("/api/voice-agent/query", {
@@ -248,7 +265,7 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
 
     // Resolve active recognition speechLang adaptively:
     let targetSpeechLang = selectedLanguage.speechLang;
-    if (selectedLanguage.code === "auto" || isAutoDetect) {
+    if (selectedLanguage.code === "auto") {
       if (detectedLanguage && detectedLanguage.code !== "auto") {
         targetSpeechLang = detectedLanguage.speechLang;
       } else {
@@ -613,6 +630,25 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
                 {interimText && (
                   <div className="text-xs font-mono text-amber-300 mt-1 italic animate-pulse">
                     "{interimText}"
+                  </div>
+                )}
+                {selectedCoord && (
+                  <div className="mt-2 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setUsePinLocation(!usePinLocation)}
+                      className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
+                        usePinLocation
+                          ? "bg-amber-500/20 text-amber-300 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)] scale-105"
+                          : "bg-slate-900/60 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-slate-200"
+                      }`}
+                      title="Toggle targeting queries strictly to your pinned map coordinates"
+                    >
+                      <MapPin className="w-3 h-3 text-amber-400" />
+                      <span>
+                        Map Pin: {selectedCoord.lat.toFixed(2)}°N, {selectedCoord.lon.toFixed(2)}°E {usePinLocation ? "(LOCKED ON PIN)" : "(CLICK TO LOCK ON PIN)"}
+                      </span>
+                    </button>
                   </div>
                 )}
               </div>

@@ -75,17 +75,18 @@ VOCAB_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "enna", "mudiyuma", "paathukaappu", "abayam", "echcharikkai", "puyal",
             "innikku", "inniku", "kaalai", "maalai", "sollunga", "parunga", "valaikuda", "kadalukku"
         ],
-        "mid": ["illa", "illai", "ama", "aama", "venum", "koodathu", "aachu", "romba", "nalla"]
+        "mid": ["samudram", "illa", "illai", "ama", "aama", "venum", "koodathu", "aachu", "romba", "nalla"]
     },
     "te": {
         "high": [
-            "ela", "undi", "vundi", "untundi", "vatavaranam", "vaatavaranam", "samudram",
-            "kadali", "chepalu", "chepala", "veta", "vepa", "alalu", "gaali", "gali",
-            "repu", "repati", "tupanu", "toofanu", "tufanu", "vellavacha", "velloccha",
-            "vellala", "cheppandi", "eeroju", "udayam", "sayantram", "ippudu",
-            "varsham", "bhadrata", "surakshitam", "hecharika", "teeram", "padava"
+            "ela undi", "vatavaranam", "vaatavaranam", "chepala veta", "chepalu", "chepala",
+            "alalu", "gaalula", "toofanu", "tupanu", "tufanu", "vellavacha", "velloccha",
+            "vellala", "cheppandi", "eeroju", "repati", "hecharika", "teeram", "padava"
         ],
-        "mid": ["ledu", "avunu", "kadu", "chala", "bavundi", "bagundi", "kavali"]
+        "mid": [
+            "ela", "samudram", "repu", "varsham", "bhadrata", "surakshitam",
+            "ledu", "avunu", "kadu", "chala", "bavundi", "bagundi", "kavali", "undi", "vundi"
+        ]
     },
     "ml": {
         "high": [
@@ -95,7 +96,7 @@ VOCAB_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "naale", "surakshitham", "munnariyippu", "chuzhalikkaattu", "mazha",
             "innum", "ravile", "vaikitt", "theeram", "vallam", "parayu", "ariyaamo"
         ],
-        "mid": ["illa", "undu", "aano", "alla", "aanu", "valare", "nalla", "kooduthal"]
+        "mid": ["samudram", "illa", "undu", "aano", "alla", "aanu", "valare", "nalla", "kooduthal"]
     },
     "kn": {
         "high": [
@@ -104,7 +105,7 @@ VOCAB_PATTERNS: Dict[str, Dict[str, List[str]]] = {
             "chandamaruta", "karavali", "teera", "hogabahuda", "hogala", "male",
             "ivattu", "beligge", "sanje", "doni", "heli", "yavaga"
         ],
-        "mid": ["ide", "illa", "houdu", "alla", "thumba", "bahala", "beku"]
+        "mid": ["samudram", "ide", "illa", "houdu", "alla", "thumba", "bahala", "beku"]
     },
     "gu": {
         "high": [
@@ -152,12 +153,12 @@ VOCAB_PATTERNS: Dict[str, Dict[str, List[str]]] = {
     },
     "en": {
         "high": [
-            "weather", "wave", "wind", "cyclone", "safe", "safety", "fishing",
-            "fish", "sea", "ocean", "port", "harbor", "temperature", "swell",
-            "tomorrow", "today", "forecast", "tide", "height", "speed", "advisory",
+            "weather", "wave", "waves", "wind", "winds", "cyclone", "cyclones", "safe", "safety", "fishing",
+            "fish", "fishes", "sea", "ocean", "port", "harbor", "temperature", "swell",
+            "tomorrow", "today", "forecast", "tide", "tides", "height", "speed", "advisory",
             "warning", "vessel", "boat", "sail", "departure", "venture"
         ],
-        "mid": ["what", "how", "can", "is", "are", "the", "in", "to", "for", "me", "tell"]
+        "mid": ["what", "how", "can", "is", "are", "the", "in", "to", "for", "me", "tell", "about", "give", "please"]
     }
 }
 
@@ -280,6 +281,7 @@ class VoiceQueryRequest(BaseModel):
     location: Optional[Dict[str, Any]] = None
     api_key: Optional[str] = None
     coast_id: Optional[str] = None
+    pin_focused: Optional[bool] = False
 
 
 @router.post("/api/voice-agent/query")
@@ -306,6 +308,7 @@ async def handle_voice_query(
     lat = req.location.get("lat") or req.location.get("latitude") if req.location else None
     lon = req.location.get("lon") or req.location.get("longitude") if req.location else None
     coast_id = req.coast_id or (req.location.get("coast_id") if req.location else None)
+    pin_focused = bool(req.pin_focused or (req.location and req.location.get("pin_focused")))
 
     loop = asyncio.get_event_loop()
     try:
@@ -317,7 +320,8 @@ async def handle_voice_query(
                     client_lat=lat,
                     client_lon=lon,
                     lang_code=lang,
-                    coast_id=coast_id
+                    coast_id=coast_id,
+                    pin_focused=pin_focused
                 )
             ),
             timeout=9.0

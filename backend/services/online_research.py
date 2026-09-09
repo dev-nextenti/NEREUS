@@ -13,6 +13,7 @@ Capabilities:
 from __future__ import annotations
 
 import asyncio
+import difflib
 import json
 import re
 import urllib.request
@@ -312,7 +313,7 @@ COASTAL_REGIONS: List[Dict[str, Any]] = [
     },
     {
         "id": "chennai",
-        "names": ["chennai", "madras", "ennore", "kamarajar", "kasimedu", "mahabalipuram", "pulicat", "சென்னை", "எண்ணூர்", "காசிமேடு", "மதராஸ்", "चेन्नई", "மகாபலிபுரம்", "చెన్నై"],
+        "names": ["chennai", "chenai", "chinai", "madras", "ennore", "kamarajar", "kasimedu", "mahabalipuram", "pulicat", "சென்னை", "எண்ணூர்", "காசிமேடு", "மதராஸ்", "चेन्नई", "மகாபலிபுரம்", "చెన్నై"],
         "primary_name": "Chennai & Ennore Harbor (Coromandel North)",
         "state": "Tamil Nadu",
         "lat": 13.11,
@@ -338,7 +339,12 @@ COASTAL_REGIONS: List[Dict[str, Any]] = [
     # ── Andhra Pradesh ──
     {
         "id": "visakhapatnam",
-        "names": ["visakhapatnam", "vizag", "gangavaram", "bheemunipatnam", "srikakulam", "bhavanapadu", "విశాఖపట్నం", "వైజాగ్", "గంగవరం", "శ్రీకాకుళం", "விசாகப்பட்டினம்", "विशाखापट्टनम", "वाइज़ैग"],
+        "names": [
+            "visakhapatnam", "visakapatanam", "visakapatnam", "vishakhapatnam", "vishakapatnam",
+            "visakha", "vizag", "vizagapatam", "gangavaram", "bheemunipatnam", "srikakulam",
+            "bhavanapadu", "విశాఖపట్నం", "వైజాగ్", "గంగవరం", "శ్రీకాకుళం", "విశాఖ",
+            "விசாகப்பட்டினம்", "विशाखापट्टनम", "विशाखापत्तनम", "वाइज़ैग"
+        ],
         "primary_name": "Visakhapatnam Outer Harbor & Gangavaram",
         "state": "Andhra Pradesh",
         "lat": 17.69,
@@ -568,18 +574,18 @@ def detect_region_from_text(
     fallback_lat: Optional[float] = None,
     fallback_lon: Optional[float] = None,
     lang_code: Optional[str] = None,
-    coast_id: Optional[str] = None
+    coast_id: Optional[str] = None,
+    pin_focused: bool = False
 ) -> Dict[str, Any]:
     """
     Intelligently extracts the coastal station or region from query.
     Hierarchy:
-    1. Direct place name / port / district alias match in query text (highest priority).
-    2. Coastal state or regional sea corridor match in query text (e.g. Kerala, Tamil Nadu, Andhra, etc.).
-    3. Indic Unicode script detection in query text (e.g. Tamil -> Chennai, Malayalam -> Kochi, etc.).
-    4. Language code regional hub routing (e.g. ta -> Chennai, ml -> Kochi, te -> Vizag, etc.).
+    1. Direct place name / port / district / island alias match in query text (highest priority).
+    2. Fuzzy token similarity matching for spoken / misspelled place names (e.g. 'visakapatanam', 'chenai', 'cochin', 'paradeep').
+    3. Coastal state or regional sea corridor match in query text (e.g. Kerala, Tamil Nadu, Andhra, etc.).
+    4. Explicit client location intent: If user query explicitly asks about local proximity ('here', 'my pin', 'current location', 'nearby', etc.) OR pin_focused is True, snap to fallback_lat/lon.
     5. Client active coast_id (ONLY IF explicitly set and not default 'konkan' or 'all_india').
-    6. Explicit client coordinates (ONLY IF passed and not default Mumbai coordinates).
-    7. Neutral National Maritime Zone (EEZ) — zero Konkan / Maharashtra bias.
+    6. Neutral National Maritime Zone (EEZ) — zero Konkan / Maharashtra / Visakhapatnam bias for general queries!
     """
     lower_q = query.lower().strip()
 
@@ -597,19 +603,41 @@ def detect_region_from_text(
     if best_region:
         return best_region
 
-    # 2. Coastal State or Corridor mention in user query
+    # 2. High-precision Fuzzy Token Match for spoken / transliterated place names (e.g. 'visakapatanam', 'paradeep', 'chenai')
+    raw_tokens = re.findall(r"[a-z]{4,}", lower_q)
+    if raw_tokens:
+        import difflib
+        alias_to_region = {}
+        candidate_aliases = []
+        for region in COASTAL_REGIONS:
+            for alias in region.get("names", []):
+                al = alias.lower()
+                if re.match(r"^[a-z\s]{4,}$", al):
+                    al_norm = al.strip()
+                    alias_to_region[al_norm] = region
+                    candidate_aliases.append(al_norm)
+
+        for token in raw_tokens:
+            if token in ("what", "where", "safe", "boat", "fish", "wave", "wind", "port", "near", "seas", "tide", "tides", "cyclone", "storm", "today", "tomorrow", "water", "speed", "height"):
+                continue
+            matches = difflib.get_close_matches(token, candidate_aliases, n=1, cutoff=0.78)
+            if matches:
+                matched_alias = matches[0]
+                return alias_to_region[matched_alias]
+
+    # 3. Coastal State or Corridor mention in user query
     state_corridor_map = [
         (["kerala", "malabar", "travancore"], "kochi"),
-        (["tamil nadu", "tamilnadu", "coromandel", "tamil"], "chennai"),
-        (["andhra", "andhra pradesh", "circars", "telugu"], "visakhapatnam"),
-        (["karnataka", "canara", "kanara", "kannada"], "mangalore"),
-        (["gujarat", "saurashtra", "kutch", "kathiawar", "gujarati"], "porbandar"),
-        (["odisha", "orissa", "utkal", "odia"], "paradip"),
-        (["west bengal", "bengal", "sundarban", "bengali"], "digha"),
-        (["goa", "konkani"], "mormugao"),
+        (["tamil nadu", "tamilnadu", "coromandel"], "chennai"),
+        (["andhra", "andhra pradesh", "circars"], "visakhapatnam"),
+        (["karnataka", "canara", "kanara"], "mangalore"),
+        (["gujarat", "saurashtra", "kutch", "kathiawar"], "porbandar"),
+        (["odisha", "orissa", "utkal"], "paradip"),
+        (["west bengal", "bengal", "sundarban"], "digha"),
+        (["goa"], "mormugao"),
         (["andaman", "nicobar", "port blair"], "port_blair"),
         (["lakshadweep"], "kavaratti"),
-        (["maharashtra", "konkan", "marathi"], "mumbai"),
+        (["maharashtra", "konkan"], "mumbai"),
     ]
     for keywords, target_id in state_corridor_map:
         if any(re.search(rf"\b{re.escape(k)}\b", lower_q) for k in keywords):
@@ -617,66 +645,30 @@ def detect_region_from_text(
                 if r["id"] == target_id:
                     return r
 
-    # 3. Indic Unicode script detection in query text (e.g. Malayalam -> Kochi, Tamil -> Chennai)
-    for ch in query:
-        cp = ord(ch)
-        if 0x0D00 <= cp <= 0x0D7F:  # Malayalam
-            for r in COASTAL_REGIONS:
-                if r["id"] == "kochi": return r
-        elif 0x0B80 <= cp <= 0x0BFF:  # Tamil
-            for r in COASTAL_REGIONS:
-                if r["id"] == "chennai": return r
-        elif 0x0C00 <= cp <= 0x0C7F:  # Telugu
-            for r in COASTAL_REGIONS:
-                if r["id"] == "visakhapatnam": return r
-        elif 0x0C80 <= cp <= 0x0CFF:  # Kannada
-            for r in COASTAL_REGIONS:
-                if r["id"] == "mangalore": return r
-        elif 0x0A80 <= cp <= 0x0AFF:  # Gujarati
-            for r in COASTAL_REGIONS:
-                if r["id"] == "porbandar": return r
-        elif 0x0980 <= cp <= 0x09FF:  # Bengali
-            for r in COASTAL_REGIONS:
-                if r["id"] == "digha": return r
-        elif 0x0B00 <= cp <= 0x0B7F:  # Odia
-            for r in COASTAL_REGIONS:
-                if r["id"] == "paradip": return r
+    # 4. Proximity / Location Intent: Use coordinates ONLY if user explicitly asked "here", "my location", "this pin", etc. OR pin_focused is True
+    proximity_markers = [
+        "here", "my location", "this location", "current location", "my pin", "this pin",
+        "nearby", "around me", "local", "where i am",
+        "यहाँ", "इस जगह", "मेरे स्थान", "पास में",
+        "ఇక్కడ", "నా లొకేషన్", "పిన్",
+        "இங்கு", "என் இடம்",
+        "ഇവിടെ", "എന്റെ സ്ഥലം",
+        "ಇಲ್ಲಿ", "ನನ್ನ ಸ್ಥಳ",
+        "इथे", "या ठिकाणी",
+        "এখানে", "আমার স্থান"
+    ]
+    has_proximity_intent = pin_focused or any(pm in lower_q for pm in proximity_markers)
 
-    # Devanagari script: check if specifically Marathi
-    if any(0x0900 <= ord(ch) <= 0x097F for ch in query):
-        if any(c in query for c in ["\u0933", "\u0931"]):  # ळ, ऱ
-            for r in COASTAL_REGIONS:
-                if r["id"] == "mumbai": return r
-        marathi_words = [
-            "आहे", "नाही", "काय", "कसा", "कशी", "कसे", "लाटा", "मासेमारी", "मासे",
-            "किनारपट्टी", "धोक्याची", "चेतावणी", "उद्या", "वारा", "सांगा", "करू", "शकतो", "का", "वादळ"
-        ]
-        if any(w in lower_q for w in marathi_words):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "mumbai": return r
-        # Generic Hindi query with no place names will fall through to All-India National Maritime Zone
+    if has_proximity_intent and fallback_lat is not None and fallback_lon is not None:
+        is_default_konkan = (abs(fallback_lat - 18.922) < 0.05 and abs(fallback_lon - 72.834) < 0.05 and coast_id == "konkan")
+        if not is_default_konkan:
+            closest = min(
+                COASTAL_REGIONS,
+                key=lambda r: (r["lat"] - fallback_lat) ** 2 + (r["lon"] - fallback_lon) ** 2
+            )
+            return closest
 
-    # 4. Language code fallback (if user asked in a regional language, route to that region!)
-    if lang_code and lang_code not in ("en", "auto", "hi"):
-        clean_code = lang_code.lower()[:2]
-        lang_to_hub = {
-            "ta": "chennai",
-            "ml": "kochi",
-            "te": "visakhapatnam",
-            "kn": "mangalore",
-            "gu": "porbandar",
-            "bn": "digha",
-            "or": "paradip",
-            "mr": "mumbai",
-        }
-        target_id = lang_to_hub.get(clean_code)
-        if target_id:
-            for r in COASTAL_REGIONS:
-                if r["id"] == target_id:
-                    return r
-
-    # 5. Client active coast_id (e.g. 'malabar' -> Kochi, 'coromandel' -> Chennai, etc.)
-    # IGNORE default 'konkan' or 'all_india' so it doesn't hijack general questions
+    # 5. Client active coast_id (e.g. user selected Malabar, Coromandel tab in UI)
     if coast_id and coast_id.lower() not in ("all_india", "konkan", ""):
         c_lower = coast_id.lower()
         if any(w in c_lower for w in ["malabar", "kerala"]):
@@ -707,17 +699,7 @@ def detect_region_from_text(
             for r in COASTAL_REGIONS:
                 if r["id"] == "kavaratti": return r
 
-    # 6. Client explicit coordinates (only if not synthetic Mumbai default coords 18.922, 72.834)
-    if fallback_lat is not None and fallback_lon is not None:
-        is_default_konkan = (abs(fallback_lat - 18.922) < 0.05 and abs(fallback_lon - 72.834) < 0.05 and coast_id == "konkan")
-        if not is_default_konkan:
-            closest = min(
-                COASTAL_REGIONS,
-                key=lambda r: (r["lat"] - fallback_lat) ** 2 + (r["lon"] - fallback_lon) ** 2
-            )
-            return closest
-
-    # 7. Neutral All-India Maritime Zone (NO Maharashtra / Konkan bias)
+    # 6. Neutral National Maritime Zone (EEZ) — zero Konkan / Visakhapatnam bias for general queries
     return NATIONAL_MARITIME_ZONE
 
 
@@ -817,12 +799,12 @@ def fetch_live_marine_telemetry(lat: float, lon: float) -> Dict[str, Any]:
 
 # ── 5. Live Web Research Grounding via DuckDuckGo ──────────────────────────────
 
-def fetch_live_web_search(region_name: str, max_results: int = 3) -> List[Dict[str, str]]:
+def fetch_live_web_search(region_name: str, max_results: int = 2) -> List[Dict[str, str]]:
     """Performs fast web search for regional warnings and weather reports."""
     query = f"{region_name} sea conditions weather INCOIS IMD advisory"
     try:
         results = []
-        with DDGS() as ddgs:
+        with DDGS(timeout=2.5) as ddgs:
             for r in ddgs.text(query, max_results=max_results):
                 results.append({
                     "title": r.get("title", ""),
@@ -841,7 +823,8 @@ def perform_online_research(
     client_lat: Optional[float] = None,
     client_lon: Optional[float] = None,
     lang_code: Optional[str] = None,
-    coast_id: Optional[str] = None
+    coast_id: Optional[str] = None,
+    pin_focused: bool = False
 ) -> Dict[str, Any]:
     """Runs parallel online research across Open-Meteo, DDGS, and regional knowledge base."""
     import concurrent.futures
@@ -852,7 +835,8 @@ def perform_online_research(
         fallback_lat=client_lat,
         fallback_lon=client_lon,
         lang_code=lang_code,
-        coast_id=coast_id
+        coast_id=coast_id,
+        pin_focused=pin_focused
     )
 
     # Fetch telemetry and web findings in parallel
@@ -860,7 +844,7 @@ def perform_online_research(
         tel_fut = pool.submit(fetch_live_marine_telemetry, region["lat"], region["lon"])
         web_fut = pool.submit(fetch_live_web_search, region["primary_name"])
         try:
-            telemetry = tel_fut.result(timeout=7.0)
+            telemetry = tel_fut.result(timeout=4.0)
         except Exception:
             telemetry = {
                 "wave_height_m": 1.2, "swell_height_m": 0.8,
@@ -870,7 +854,7 @@ def perform_online_research(
                 "safety_verdict": "SAFE"
             }
         try:
-            web_findings = web_fut.result(timeout=5.0)
+            web_findings = web_fut.result(timeout=2.5)
         except Exception:
             web_findings = []
 

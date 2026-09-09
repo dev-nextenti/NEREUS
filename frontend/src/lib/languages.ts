@@ -198,17 +198,18 @@ const VOCAB_PATTERNS: Record<string, { high: string[]; mid: string[] }> = {
       "enna", "mudiyuma", "paathukaappu", "abayam", "echcharikkai", "puyal",
       "innikku", "inniku", "kaalai", "maalai", "sollunga", "parunga", "valaikuda", "kadalukku"
     ],
-    mid: ["illa", "illai", "ama", "aama", "venum", "koodathu", "aachu", "romba", "nalla"]
+    mid: ["samudram", "illa", "illai", "ama", "aama", "venum", "koodathu", "aachu", "romba", "nalla"]
   },
   te: {
     high: [
-      "ela", "undi", "vundi", "untundi", "vatavaranam", "vaatavaranam", "samudram",
-      "kadali", "chepalu", "chepala", "veta", "vepa", "alalu", "gaali", "gali",
-      "repu", "repati", "tupanu", "toofanu", "tufanu", "vellavacha", "velloccha",
-      "vellala", "cheppandi", "eeroju", "udayam", "sayantram", "ippudu",
-      "varsham", "bhadrata", "surakshitam", "hecharika", "teeram", "padava"
+      "ela undi", "vatavaranam", "vaatavaranam", "chepala veta", "chepalu", "chepala",
+      "alalu", "gaalula", "toofanu", "tupanu", "tufanu", "vellavacha", "velloccha",
+      "vellala", "cheppandi", "eeroju", "repati", "hecharika", "teeram", "padava"
     ],
-    mid: ["ledu", "avunu", "kadu", "chala", "bavundi", "bagundi", "kavali"]
+    mid: [
+      "ela", "samudram", "repu", "varsham", "bhadrata", "surakshitam",
+      "ledu", "avunu", "kadu", "chala", "bavundi", "bagundi", "kavali", "undi", "vundi"
+    ]
   },
   ml: {
     high: [
@@ -218,7 +219,7 @@ const VOCAB_PATTERNS: Record<string, { high: string[]; mid: string[] }> = {
       "naale", "surakshitham", "munnariyippu", "chuzhalikkaattu", "mazha",
       "innum", "ravile", "vaikitt", "theeram", "vallam", "parayu", "ariyaamo"
     ],
-    mid: ["illa", "undu", "aano", "alla", "aanu", "valare", "nalla", "kooduthal"]
+    mid: ["samudram", "illa", "undu", "aano", "alla", "aanu", "valare", "nalla", "kooduthal"]
   },
   kn: {
     high: [
@@ -227,7 +228,7 @@ const VOCAB_PATTERNS: Record<string, { high: string[]; mid: string[] }> = {
       "chandamaruta", "karavali", "teera", "hogabahuda", "hogala", "male",
       "ivattu", "beligge", "sanje", "doni", "heli", "yavaga"
     ],
-    mid: ["ide", "illa", "houdu", "alla", "thumba", "bahala", "beku"]
+    mid: ["samudram", "ide", "illa", "houdu", "alla", "thumba", "bahala", "beku"]
   },
   gu: {
     high: [
@@ -275,12 +276,12 @@ const VOCAB_PATTERNS: Record<string, { high: string[]; mid: string[] }> = {
   },
   en: {
     high: [
-      "weather", "wave", "wind", "cyclone", "safe", "safety", "fishing",
-      "fish", "sea", "ocean", "port", "harbor", "temperature", "swell",
-      "tomorrow", "today", "forecast", "tide", "height", "speed", "advisory",
+      "weather", "wave", "waves", "wind", "winds", "cyclone", "cyclones", "safe", "safety", "fishing",
+      "fish", "fishes", "sea", "ocean", "port", "harbor", "temperature", "swell",
+      "tomorrow", "today", "forecast", "tide", "tides", "height", "speed", "advisory",
       "warning", "vessel", "boat", "sail", "departure", "venture"
     ],
-    mid: ["what", "how", "can", "is", "are", "the", "in", "to", "for", "me", "tell"]
+    mid: ["what", "how", "can", "is", "are", "the", "in", "to", "for", "me", "tell", "about", "give", "please"]
   }
 };
 
