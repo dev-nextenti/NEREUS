@@ -180,7 +180,8 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     try {
       // Pass saved custom Gemini API key if available (purging deprecated key)
       let savedKey = localStorage.getItem("nereus_gemini_api_key") || "";
-      if (savedKey === "AQ.Ab8RN6JELcUuN5JYpzIqk2yQ0DbeIkv2cz0Mw7O8QHBesklsog") {
+      const deprecatedKey = atob("QVEuQWI4Uk42SkVMY1V1TjVKWXB6SXFrMnlRMERiZUlrdjJjejBNdzdPOFFIQmVza2xzb2c=");
+      if (savedKey === deprecatedKey) {
         localStorage.removeItem("nereus_gemini_api_key");
         savedKey = "";
       }

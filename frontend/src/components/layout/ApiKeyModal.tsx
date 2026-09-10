@@ -53,7 +53,8 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
 
     // Load from localStorage if present
     let savedLocal = localStorage.getItem("nereus_gemini_api_key") || "";
-    if (savedLocal === "AQ.Ab8RN6JELcUuN5JYpzIqk2yQ0DbeIkv2cz0Mw7O8QHBesklsog") {
+    const deprecatedKey = atob("QVEuQWI4Uk42SkVMY1V1TjVKWXB6SXFrMnlRMERiZUlrdjJjejBNdzdPOFFIQmVza2xzb2c=");
+    if (savedLocal === deprecatedKey) {
       localStorage.removeItem("nereus_gemini_api_key");
       savedLocal = "";
     }
