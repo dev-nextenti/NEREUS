@@ -13,7 +13,7 @@
  * - Instant quick-prompts for coastal mariners
  */
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import {
   Mic, MicOff, Volume2, VolumeX, X, Radio, Sparkles,
   Zap, AlertTriangle, Shield, Send, Check, RefreshCw, Activity, Waves, MapPin
@@ -42,6 +42,9 @@ interface AIVoiceAgentProps {
   initialLanguage?: VoiceLanguage;
   selectedCoord?: { lat: number; lon: number } | null;
   selectedCoastId?: string;
+  coastalStations?: any[];
+  initialQuery?: string;
+  onClearInitialQuery?: () => void;
 }
 
 export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
@@ -50,19 +53,28 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
   initialLanguage,
   selectedCoord,
   selectedCoastId,
+  coastalStations,
+  initialQuery,
+  onClearInitialQuery,
 }) => {
   const [isAutoDetect, setIsAutoDetect] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState<VoiceLanguage>(
     () => initialLanguage || AUTO_LANGUAGE
   );
   const [detectedLanguage, setDetectedLanguage] = useState<VoiceLanguage | null>(null);
-  const [usePinLocation, setUsePinLocation] = useState(false);
+  const [usePinLocation, setUsePinLocation] = useState(true);
 
   useEffect(() => {
     if (initialLanguage && initialLanguage.code !== "auto") {
       setSelectedLanguage(initialLanguage);
     }
   }, [initialLanguage]);
+
+  useEffect(() => {
+    if (selectedCoord) {
+      setUsePinLocation(true);
+    }
+  }, [selectedCoord]);
   const [isListening, setIsListening] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -78,6 +90,31 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
   const animIntervalRef = useRef<any>(null);
   const lastSpeechTextRef = useRef<string>("");
   const hasDispatchedRef = useRef<boolean>(false);
+
+  // Resolve active station details from coastalStations for 100% map synchronization
+  const activeStation = useMemo(() => {
+    if (!coastalStations || coastalStations.length === 0) return null;
+    if (selectedCoastId) {
+      const byId = coastalStations.find((s: any) => s.id === selectedCoastId.toLowerCase());
+      if (byId) return byId;
+    }
+    if (selectedCoord) {
+      return coastalStations.find(
+        (s: any) =>
+          Math.abs(s.latitude - selectedCoord.lat) < 0.15 &&
+          Math.abs(s.longitude - selectedCoord.lon) < 0.15
+      );
+    }
+    return null;
+  }, [coastalStations, selectedCoastId, selectedCoord]);
+
+  // Execute initial query if provided (e.g. from VoiceAssistantModal prompt)
+  useEffect(() => {
+    if (isOpen && initialQuery && initialQuery.trim()) {
+      sendQueryToAI(initialQuery.trim());
+      onClearInitialQuery?.();
+    }
+  }, [isOpen, initialQuery]);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -124,16 +161,61 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
       audioPlayerRef.current.pause();
       audioPlayerRef.current = null;
     }
+    if ("speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
     setIsSpeaking(false);
   };
 
-  const playSpecificAudio = (b64: string) => {
-    stopAudio();
+  const fallbackWebSpeech = useCallback((text: string, langCode = "en") => {
+    if (!("speechSynthesis" in window)) return;
     try {
-      const audioBlob = new Blob(
-        [Uint8Array.from(atob(b64), c => c.charCodeAt(0))],
-        { type: "audio/mp3" }
+      window.speechSynthesis.cancel();
+      const cleanText = text
+        .replace(/\*\*([^*]+)\*\*/g, "$1")
+        .replace(/\*([^*]+)\*/g, "$1")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/\[VERDICT:[^\]]+\]/g, "")
+        .replace(/[#_`]/g, "")
+        .trim();
+      if (!cleanText) return;
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      const langObj = getLanguageByCode(langCode);
+      utterance.lang = langObj?.speechLang || "en-IN";
+      utterance.rate = langCode === "en" ? 0.95 : 0.90;
+
+      const voices = window.speechSynthesis.getVoices();
+      const matched = voices.find((v) =>
+        v.lang.toLowerCase().replace("_", "-").startsWith((langObj?.speechLang || "en").toLowerCase()) ||
+        v.lang.toLowerCase().startsWith(langCode.toLowerCase())
       );
+      if (matched) utterance.voice = matched;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      console.warn("[VoiceAgent] WebSpeech fallback notice:", e);
+      setIsSpeaking(false);
+    }
+  }, []);
+
+  const playSpecificAudio = (b64?: string, fallbackText?: string, langCode = "en") => {
+    stopAudio();
+    if (!b64 || !b64.trim()) {
+      if (fallbackText) fallbackWebSpeech(fallbackText, langCode);
+      return;
+    }
+    try {
+      const cleanB64 = b64.replace(/\s/g, "");
+      const byteCharacters = atob(cleanB64);
+      const byteNumbers = new Uint8Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const audioBlob = new Blob([byteNumbers], { type: "audio/mp3" });
       const audioUrl = URL.createObjectURL(audioBlob);
       const audio = new Audio(audioUrl);
       audioPlayerRef.current = audio;
@@ -143,10 +225,18 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
         setIsSpeaking(false);
         URL.revokeObjectURL(audioUrl);
       };
-      audio.onerror = () => setIsSpeaking(false);
-      audio.play().catch(e => console.warn("[VoiceAgent] Audio playback notice:", e));
+      audio.onerror = () => {
+        setIsSpeaking(false);
+        if (fallbackText) fallbackWebSpeech(fallbackText, langCode);
+      };
+      audio.play().catch(e => {
+        console.warn("[VoiceAgent] Neural audio play notice (browser autoplay policy, falling back to WebSpeech):", e);
+        setIsSpeaking(false);
+        if (fallbackText) fallbackWebSpeech(fallbackText, langCode);
+      });
     } catch (e) {
       console.error("[VoiceAgent] Audio decoding error:", e);
+      if (fallbackText) fallbackWebSpeech(fallbackText, langCode);
     }
   };
 
@@ -178,43 +268,22 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     }
 
     try {
-      // Pass saved custom Gemini API key if available (purging deprecated key)
-      let savedKey = localStorage.getItem("nereus_gemini_api_key") || "";
-      const deprecatedKey = atob("QVEuQWI4Uk42SkVMY1V1TjVKWXB6SXFrMnlRMERiZUlrdjJjejBNdzdPOFFIQmVza2xzb2c=");
-      if (savedKey === deprecatedKey) {
-        localStorage.removeItem("nereus_gemini_api_key");
-        savedKey = "";
-      }
+      // Pass saved custom Gemini API key if available
+      const savedKey = localStorage.getItem("nereus_gemini_api_key") || "";
       const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (savedKey) headers["x-gemini-api-key"] = savedKey;
+      if (savedKey && savedKey.length > 8) headers["x-gemini-api-key"] = savedKey;
 
-      // Proximity intent detection: only attach coordinates if user asks about "here", "my location", "this pin", etc.
-      // or if the user explicitly clicked the pin location toggle in the voice modal
-      const lowerQ = queryText.toLowerCase();
-      const proximityKeywords = [
-        "here", "my location", "this location", "current location", "my pin", "this pin",
-        "nearby", "around me", "local", "where i am",
-        "यहाँ", "इस जगह", "मेरे स्थान", "पास में",
-        "ఇక్కడ", "నా లొకేషన్", "పిన్",
-        "இங்கு", "என் இடம்",
-        "ഇവിടെ", "എന്റെ സ്ഥലം",
-        "ಇಲ್ಲಿ", "ನನ್ನ ಸ್ಥಳ",
-        "इथे", "या ठिकाणी",
-        "এখানে", "আমার স্থান"
-      ];
-      const hasLocalIntent = usePinLocation || proximityKeywords.some((k) => lowerQ.includes(k));
-
-      // Only pass coordinates if user explicitly intended local proximity
-      const lat = hasLocalIntent && selectedCoord ? selectedCoord.lat : undefined;
-      const lon = hasLocalIntent && selectedCoord ? selectedCoord.lon : undefined;
-      const coast = hasLocalIntent && selectedCoastId && selectedCoastId !== "konkan" ? selectedCoastId : undefined;
+      // Authoritative 4K map grounding: always attach selected coordinates and station ID
+      const lat = selectedCoord ? selectedCoord.lat : undefined;
+      const lon = selectedCoord ? selectedCoord.lon : undefined;
+      const coast = selectedCoastId && selectedCoastId !== "all_india" ? selectedCoastId : undefined;
 
       const bodyPayload: any = {
         query: queryText,
         language: activeLang.code,
-        location: lat && lon ? { latitude: lat, longitude: lon, coast_id: coast, pin_focused: hasLocalIntent } : undefined,
+        location: lat !== undefined && lon !== undefined ? { latitude: lat, longitude: lon, coast_id: coast, pin_focused: true } : undefined,
         coast_id: coast,
-        pin_focused: hasLocalIntent
+        pin_focused: true
       };
 
       const resp = await fetch("/api/voice-agent/query", {
@@ -231,23 +300,24 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
 
       setIsThinking(false);
 
+      const replyText = data.response_text || data.response || "INCOIS Marine Advisory generated.";
+      const audioB64 = data.audio_base64 || data.audio;
+
       // Add AI response message
       setTranscripts(prev => [
         ...prev,
         {
           id: Date.now() + "-ai",
           role: "model",
-          text: data.response_text || "Advisory generated.",
+          text: replyText,
           verdict: data.safety_verdict,
           timestamp: new Date(),
-          audioBase64: data.audio_base64
+          audioBase64: audioB64
         }
       ]);
 
-      // Play Neural Audio
-      if (data.audio_base64) {
-        playSpecificAudio(data.audio_base64);
-      }
+      // Play Audio (Neural EdgeTTS with WebSpeech fallback)
+      playSpecificAudio(audioB64, replyText, activeLang.code);
     } catch (err: any) {
       console.error("[VoiceAgent] Query failed:", err);
       setIsThinking(false);
@@ -715,25 +785,28 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
                     </button>
                   </div>
                 )}
-                {selectedCoord && (
-                  <div className="mt-2 flex items-center justify-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setUsePinLocation(!usePinLocation)}
-                      className={`px-3 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 border transition-all cursor-pointer ${
-                        usePinLocation
-                          ? "bg-amber-500/20 text-amber-300 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)] scale-105"
-                          : "bg-slate-900/60 text-slate-400 border-slate-700 hover:border-slate-500 hover:text-slate-200"
-                      }`}
-                      title="Toggle targeting queries strictly to your pinned map coordinates"
-                    >
-                      <MapPin className="w-3 h-3 text-amber-400" />
+                <div className="mt-2 flex items-center justify-center gap-2 flex-wrap">
+                  {activeStation ? (
+                    <div className="px-3.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 border border-emerald-400/60 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                      <Radio className="w-3 h-3 text-emerald-400 animate-pulse" />
                       <span>
-                        Map Pin: {selectedCoord.lat.toFixed(2)}°N, {selectedCoord.lon.toFixed(2)}°E {usePinLocation ? "(LOCKED ON PIN)" : "(CLICK TO LOCK ON PIN)"}
+                        📍 4K MAP SYNC: {activeStation.name} • Wave: {activeStation.wave_height_m}m | Wind: {activeStation.wind_speed_kmh} km/h | Temp: {activeStation.temperature_c}°C
                       </span>
-                    </button>
-                  </div>
-                )}
+                    </div>
+                  ) : selectedCoord ? (
+                    <div className="px-3.5 py-1 rounded-full text-[10px] font-mono font-bold flex items-center gap-1.5 bg-cyan-500/20 text-cyan-300 border border-cyan-400/60 shadow-[0_0_15px_rgba(0,229,255,0.3)]">
+                      <MapPin className="w-3 h-3 text-cyan-400 animate-pulse" />
+                      <span>
+                        📍 MAP PIN: {selectedCoord.lat.toFixed(2)}°N, {selectedCoord.lon.toFixed(2)}°E • INCOIS Grounded
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="px-3.5 py-1 rounded-full text-[10px] font-mono text-cyan-400/80 bg-cyan-950/40 border border-cyan-500/30 flex items-center gap-1.5">
+                      <Shield className="w-3 h-3 text-cyan-300" />
+                      <span>INCOIS Live Telemetry Monitored (29 Coastal Stations Active)</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Audio Waveform Equalizer */}
@@ -817,16 +890,16 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
                         )}
                       </div>
                       <div className="whitespace-pre-line text-sm">{t.text}</div>
-                      {t.role === "model" && t.audioBase64 && (
+                      {t.role === "model" && (
                         <div className="mt-2 pt-2 border-t border-teal-500/20 flex items-center gap-2">
                           <button
                             type="button"
-                            onClick={() => playSpecificAudio(t.audioBase64!)}
+                            onClick={() => playSpecificAudio(t.audioBase64, t.text, selectedLanguage.code)}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-400/40 text-teal-200 text-[10px] font-mono transition-all cursor-pointer shadow-[0_0_10px_rgba(0,240,181,0.2)]"
-                            title="Replay Voice Speech"
+                            title="Listen to Voice Advisory"
                           >
                             <Volume2 className="w-3.5 h-3.5 text-teal-300" />
-                            <span>🔊 Replay Voice</span>
+                            <span>🔊 Listen to Voice</span>
                           </button>
                         </div>
                       )}

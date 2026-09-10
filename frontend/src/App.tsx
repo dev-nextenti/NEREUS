@@ -104,6 +104,7 @@ export const App: React.FC = () => {
   const [autoSpeak, setAutoSpeak] = useState(true);
   const [lastTranscript, setLastTranscript] = useState<string>("");
   const [lastResponse, setLastResponse] = useState<string>("");
+  const [voiceInitialQuery, setVoiceInitialQuery] = useState<string>("");
 
   const handleSelectLanguage = (lang: VoiceLanguage) => {
     setCurrentLanguage(lang);
@@ -745,6 +746,9 @@ export const App: React.FC = () => {
         initialLanguage={currentLanguage}
         selectedCoord={selectedCoord}
         selectedCoastId={selectedCoastId}
+        coastalStations={coastalStations}
+        initialQuery={voiceInitialQuery}
+        onClearInitialQuery={() => setVoiceInitialQuery("")}
       />
 
       {/* ─── Multilingual Voice Assistant Modal (Language Selection) ─── */}
@@ -759,6 +763,7 @@ export const App: React.FC = () => {
         lastTranscript={lastTranscript}
         lastResponse={lastResponse}
         onSendQuery={(query) => {
+          setVoiceInitialQuery(query);
           setIsVoiceModalOpen(false);
           setIsAIAgentOpen(true);
         }}

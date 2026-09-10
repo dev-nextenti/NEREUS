@@ -72,7 +72,7 @@ def get_gemini_api_key(client_override: Optional[str] = None) -> str:
     4. Mark-LI config/api_keys.json
     5. Hardcoded default fallback key
     """
-    if client_override and client_override.strip() and len(client_override.strip()) > 8:
+    if client_override and isinstance(client_override, str) and len(client_override.strip()) > 8:
         cleaned = client_override.strip()
         if cleaned != OLD_DEPRECATED_KEY:
             return cleaned

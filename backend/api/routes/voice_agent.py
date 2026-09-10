@@ -360,7 +360,7 @@ async def handle_voice_query(
                     f"User asks in {LANGUAGE_NAMES.get(lang, 'English')}: '{query_text}'. "
                     f"Provide live regional marine safety advice based on current live conditions."
                 )
-                candidate_models = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.6-flash", "gemini-3.1-flash-lite"]
+                candidate_models = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
                 for mdl in candidate_models:
                     try:
                         resp = client.models.generate_content(
@@ -428,6 +428,7 @@ async def handle_voice_query(
         "telemetry": telemetry,
         "web_findings_count": len(research.get("web_findings", [])),
         "audio_base64": audio_b64,
+        "audio": audio_b64,
         "audio_mime": "audio/mp3" if audio_b64 else None,
     }
 

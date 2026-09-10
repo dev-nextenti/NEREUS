@@ -202,9 +202,9 @@ COASTAL_REGIONS: List[Dict[str, Any]] = [
 
     # ── Kerala ──
     {
-        "id": "kozhikode",
-        "names": ["kozhikode", "calicut", "beypore", "kannur", "thalassery", "kasargod", "കോഴിക്കോട്", "ബേപ്പൂർ", "കണ്ണൂർ", "കാസർഗോഡ്", "कालीकट", "कोझिकोड"],
-        "primary_name": "Malabar Coast (Beypore / Kozhikode & Kannur)",
+        "id": "beypore",
+        "names": ["beypore", "kozhikode", "calicut", "kannur", "thalassery", "kasargod", "കോഴിക്കോട്", "ബേപ്പൂർ", "കണ്ണൂർ", "കാസർഗോഡ്", "कालीकट", "कोझिकोड"],
+        "primary_name": "Beypore & Kozhikode Harbor (Malabar Coast)",
         "state": "Kerala",
         "lat": 11.18,
         "lon": 75.80,
@@ -645,61 +645,33 @@ def detect_region_from_text(
                 if r["id"] == target_id:
                     return r
 
-    # 4. Proximity / Location Intent: Use coordinates ONLY if user explicitly asked "here", "my location", "this pin", etc. OR pin_focused is True
-    proximity_markers = [
-        "here", "my location", "this location", "current location", "my pin", "this pin",
-        "nearby", "around me", "local", "where i am",
-        "यहाँ", "इस जगह", "मेरे स्थान", "पास में",
-        "ఇక్కడ", "నా లొకేషన్", "పిన్",
-        "இங்கு", "என் இடம்",
-        "ഇവിടെ", "എന്റെ സ്ഥലം",
-        "ಇಲ್ಲಿ", "ನನ್ನ ಸ್ಥಳ",
-        "इथे", "या ठिकाणी",
-        "এখানে", "আমার স্থান"
-    ]
-    has_proximity_intent = pin_focused or any(pm in lower_q for pm in proximity_markers)
+    # 4. Context Grounding: If client provides active coast_id (from 4K map selection)
+    if coast_id and coast_id.lower() not in ("all_india", "national", ""):
+        c_clean = coast_id.lower().strip()
+        # Direct exact match by station ID (e.g. chennai, mumbai, visakhapatnam, beypore, porbandar)
+        for r in COASTAL_REGIONS:
+            if r["id"] == c_clean:
+                return r
+        # Partial match in ID or alias names
+        for r in COASTAL_REGIONS:
+            if c_clean in r["id"] or r["id"] in c_clean or any(c_clean in n.lower() for n in r.get("names", [])):
+                return r
+        # Regional maritime corridor aliases (e.g. malabar, coromandel, konkan, canara, utkal)
+        for keywords, target_id in state_corridor_map:
+            if any(k in c_clean for k in keywords):
+                for r in COASTAL_REGIONS:
+                    if r["id"] == target_id:
+                        return r
 
-    if has_proximity_intent and fallback_lat is not None and fallback_lon is not None:
-        is_default_konkan = (abs(fallback_lat - 18.922) < 0.05 and abs(fallback_lon - 72.834) < 0.05 and coast_id == "konkan")
-        if not is_default_konkan:
-            closest = min(
-                COASTAL_REGIONS,
-                key=lambda r: (r["lat"] - fallback_lat) ** 2 + (r["lon"] - fallback_lon) ** 2
-            )
-            return closest
+    # 5. Coordinate Grounding: Snap directly to the nearest station to user's pinned map coordinates
+    if fallback_lat is not None and fallback_lon is not None:
+        closest = min(
+            COASTAL_REGIONS,
+            key=lambda r: (r["lat"] - fallback_lat) ** 2 + (r["lon"] - fallback_lon) ** 2
+        )
+        return closest
 
-    # 5. Client active coast_id (e.g. user selected Malabar, Coromandel tab in UI)
-    if coast_id and coast_id.lower() not in ("all_india", "konkan", ""):
-        c_lower = coast_id.lower()
-        if any(w in c_lower for w in ["malabar", "kerala"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "kochi": return r
-        elif any(w in c_lower for w in ["coromandel", "tamil"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "chennai": return r
-        elif any(w in c_lower for w in ["andhra", "circars"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "visakhapatnam": return r
-        elif any(w in c_lower for w in ["canara", "karnataka"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "mangalore": return r
-        elif any(w in c_lower for w in ["saurashtra", "gujarat", "kutch"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "porbandar": return r
-        elif any(w in c_lower for w in ["utkal", "odisha"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "paradip": return r
-        elif any(w in c_lower for w in ["bengal", "sundarban"]):
-            for r in COASTAL_REGIONS:
-                if r["id"] == "digha": return r
-        elif "andaman" in c_lower:
-            for r in COASTAL_REGIONS:
-                if r["id"] == "port_blair": return r
-        elif "lakshadweep" in c_lower:
-            for r in COASTAL_REGIONS:
-                if r["id"] == "kavaratti": return r
-
-    # 6. Neutral National Maritime Zone (EEZ) — zero Konkan / Visakhapatnam bias for general queries
+    # 6. Neutral National Maritime Zone (EEZ) — used only when zero regional context is provided
     return NATIONAL_MARITIME_ZONE
 
 
