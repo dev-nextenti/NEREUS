@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import './index.css'
 
-// Production live backend endpoint
-const PROD_BACKEND_URL = "https://5fca-160-187-169-4.ngrok-free.app";
+// Production live backend endpoint (interim active tunnel; replace with permanent cloud URL)
+const PROD_BACKEND_URL = "https://468d-160-187-169-4.ngrok-free.app";
 
 // Intercept all fetch requests to route to live backend on static hosts and bypass ngrok warning
 const originalFetch = window.fetch;
