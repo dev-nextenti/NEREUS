@@ -3,14 +3,28 @@ import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import './index.css'
 
-// Intercept all fetch requests to automatically bypass ngrok free tier warning on API calls
+// Production live backend endpoint
+const PROD_BACKEND_URL = "https://5fca-160-187-169-4.ngrok-free.app";
+
+// Intercept all fetch requests to route to live backend on static hosts and bypass ngrok warning
 const originalFetch = window.fetch;
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  let targetUrl = input;
+  if (typeof input === 'string' && input.startsWith('/api')) {
+    const isLocalOrSameOrigin =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.origin.includes('ngrok-free.app');
+    if (!isLocalOrSameOrigin) {
+      targetUrl = `${PROD_BACKEND_URL}${input}`;
+    }
+  }
+
   const initObj = init ? { ...init } : {};
   const headers = new Headers(initObj.headers || {});
   headers.set('ngrok-skip-browser-warning', 'true');
   initObj.headers = headers;
-  return originalFetch(input, initObj);
+  return originalFetch(targetUrl, initObj);
 };
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
