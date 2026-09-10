@@ -3,8 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { App } from './App'
 import './index.css'
 
-// Production live backend endpoint (interim active tunnel; replace with permanent cloud URL)
-const PROD_BACKEND_URL = "https://468d-160-187-169-4.ngrok-free.app";
+// Permanent 24/7 Cloud Backend (Render.com)
+const PROD_BACKEND_URL = "https://nereus-marine-intelligence-ptz2.onrender.com";
 
 // Intercept all fetch requests to route to live backend on static hosts and bypass ngrok warning
 const originalFetch = window.fetch;
