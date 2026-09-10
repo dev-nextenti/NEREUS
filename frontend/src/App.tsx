@@ -396,11 +396,48 @@ export const App: React.FC = () => {
   };
 
 
-  // Coast Selection Handler
+  // Coast & Station Selection Handler (Synchronized with INCOIS Live Telemetry)
   const handleSelectCoast = (coastId: string) => {
     setSelectedCoastId(coastId);
+
+    // 1. Check live INCOIS coastal stations first (Visakhapatnam, Mumbai, Chennai, Kochi, etc.)
+    const liveSt = coastalStations.find((s) => s.id === coastId || s.name.toLowerCase().includes(coastId.toLowerCase()));
+    if (liveSt) {
+      setSelectedCoord({ lat: liveSt.latitude, lon: liveSt.longitude });
+      setPinCoord({ lat: liveSt.latitude, lon: liveSt.longitude });
+      setWeather((prev) => ({
+        ...prev,
+        temperature: liveSt.temperature_c,
+        wave_height_m: liveSt.wave_height_m,
+        wave_period_s: liveSt.wave_period_s || 7.0,
+        wind_speed_kmh: liveSt.wind_speed_kmh,
+        wind_direction_deg: liveSt.wind_direction_deg || 180,
+        cyclone_risk: liveSt.safety_verdict === "DANGER" ? "HIGH" : liveSt.safety_verdict === "CAUTION" ? "MODERATE" : "LOW",
+        source: "INCOIS (incois.gov.in) Ocean State Forecast",
+      }));
+      return;
+    }
+
+    // 2. Check Macro Coastal Regions and match to state station
     const c = INDIAN_COASTS.find((item) => item.id === coastId);
     if (c) {
+      const stateSt = coastalStations.find(s => s.state.toLowerCase().includes(c.states.toLowerCase()) || c.states.toLowerCase().includes(s.state.toLowerCase()));
+      if (stateSt) {
+        setSelectedCoord({ lat: stateSt.latitude, lon: stateSt.longitude });
+        setPinCoord({ lat: stateSt.latitude, lon: stateSt.longitude });
+        setWeather((prev) => ({
+          ...prev,
+          temperature: stateSt.temperature_c,
+          wave_height_m: stateSt.wave_height_m,
+          wave_period_s: stateSt.wave_period_s || 7.0,
+          wind_speed_kmh: stateSt.wind_speed_kmh,
+          wind_direction_deg: stateSt.wind_direction_deg || 180,
+          cyclone_risk: stateSt.safety_verdict === "DANGER" ? "HIGH" : stateSt.safety_verdict === "CAUTION" ? "MODERATE" : "LOW",
+          source: "INCOIS (incois.gov.in) Ocean State Forecast",
+        }));
+        return;
+      }
+
       setSelectedCoord({ lat: c.latitude, lon: c.longitude });
       setPinCoord({ lat: c.latitude, lon: c.longitude });
       setWeather((prev) => ({
@@ -409,6 +446,7 @@ export const App: React.FC = () => {
         wave_height_m: c.wave_height_m,
         wave_period_s: c.wave_period_s,
         wind_speed_kmh: c.wind_speed_kmh,
+        source: "INCOIS (incois.gov.in) Ocean State Forecast",
       }));
     }
   };

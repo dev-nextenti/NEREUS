@@ -600,13 +600,19 @@ export const MarkLiMainFrame: React.FC<MarkLiMainFrameProps> = ({
 
           {/* Coast Verdict Snapshot */}
           <div className="p-2.5 rounded border space-y-1 text-[10px]" style={{ background: C.PANEL, borderColor: C.BORDER_B }}>
-            <div className="font-bold" style={{ color: C.PRI }}>ACTIVE COAST STATE</div>
-            <div className="text-[11px] font-bold text-white capitalize">{selectedCoastId} Coast</div>
-            <div className="text-[9px]" style={{ color: C.TEXT_MED }}>
-              Wave: {weather.wave_height_m}m • SST: {weather.temperature}°C
+            <div className="flex justify-between items-center">
+              <span className="font-bold" style={{ color: C.PRI }}>INCOIS ACTIVE SECTOR</span>
+              <a href="https://incois.gov.in" target="_blank" rel="noreferrer" className="text-[8px] text-teal-300 underline">
+                incois.gov.in
+              </a>
             </div>
-            <div className="text-[9px] font-bold" style={{ color: C.GREEN }}>
-              STATUS: {coreState}
+            <div className="text-[11px] font-bold text-white capitalize">{selectedCoastId} Sector</div>
+            <div className="text-[9px]" style={{ color: C.TEXT_MED }}>
+              Wave: {weather.wave_height_m}m • Temp: {weather.temperature}°C • Wind: {weather.wind_speed_kmh}km/h
+            </div>
+            <div className="text-[9px] font-bold flex justify-between" style={{ color: C.GREEN }}>
+              <span>STATUS: {coreState}</span>
+              <span className="text-cyan-300">INCOIS SYNCED</span>
             </div>
           </div>
         </div>
@@ -871,16 +877,27 @@ export const MarkLiMainFrame: React.FC<MarkLiMainFrameProps> = ({
             </div>
           </div>
 
-          {/* ─── COASTAL CONDITIONS MATRIX: HARSH / MODERATE / SAFE (Live Triage) ─── */}
+          {/* ─── COASTAL CONDITIONS MATRIX: HARSH / MODERATE / SAFE (INCOIS Triage) ─── */}
           <div className="space-y-2 flex-1 flex flex-col min-h-0 pt-1 border-t" style={{ borderColor: C.BORDER }}>
             <div className="flex items-center justify-between text-[10px] font-bold" style={{ color: C.TEXT_MED }}>
               <div className="flex items-center gap-1.5" style={{ color: C.PRI }}>
                 <Shield className="w-3.5 h-3.5 text-cyan-400" />
-                <span>LIVE CONDITIONS MATRIX</span>
+                <span>INCOIS CONDITIONS MATRIX</span>
               </div>
-              <span className="text-[9px] font-mono" style={{ color: C.GREEN }}>
-                {stationsData.length} Stations
-              </span>
+              <div className="flex items-center gap-1.5">
+                <a
+                  href="https://incois.gov.in"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[8px] font-mono text-cyan-400 hover:text-white underline"
+                  title="Official INCOIS Portal"
+                >
+                  incois.gov.in ↗
+                </a>
+                <span className="text-[9px] font-mono" style={{ color: C.GREEN }}>
+                  ({stationsData.length})
+                </span>
+              </div>
             </div>
 
             {/* Filter Buttons */}

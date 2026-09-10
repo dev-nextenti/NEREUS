@@ -36,6 +36,8 @@ yarn-error.log*
 *.db
 backend/data/*.db
 backend/data/api_keys.json
+backend/config/api_keys.json
 .env
+.env.local
 .DS_Store
 Thumbs.db

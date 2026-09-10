@@ -47,7 +47,46 @@ NEREUS is a next-generation conversational marine AI operating system and comman
 
 ## 🚀 Quickstart
 
-### Option 1: Local Development
+### Option 1: Deploy through GitHub (Cloud & Production)
+
+NEREUS is fully containerized and includes native CI/CD workflows and 1-click cloud blueprints for instant deployment straight from GitHub.
+
+#### 1. Push Code to your GitHub Repository
+```bash
+# Initialize and rename default branch to main
+git branch -M main
+
+# Link your GitHub repository
+git remote add origin https://github.com/<YOUR_USERNAME>/<YOUR_REPO_NAME>.git
+
+# Push to GitHub
+git push -u origin main
+```
+
+#### 2. 1-Click Deploy on Render.com (Recommended)
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com)
+1. Go to [Render.com Dashboard](https://dashboard.render.com/) -> **New +** -> **Blueprint**.
+2. Connect your GitHub repository.
+3. Render automatically detects [`render.yaml`](render.yaml) and builds the multi-stage Docker container.
+4. Under **Environment Variables**, set:
+   - `GEMINI_API_KEY`: Your Google Gemini API key (from [Google AI Studio](https://aistudio.google.com/)).
+5. Click **Apply**. Your app is immediately live on a global `https://<service-name>.onrender.com` URL with automatic HTTPS and zero CORS configuration!
+
+#### 3. Deploy on Railway.app
+1. Go to [Railway.app](https://railway.app/) -> **New Project** -> **Deploy from GitHub repo**.
+2. Select your repository. Railway automatically detects [`railway.json`](railway.json) and [`Dockerfile`](Dockerfile).
+3. In **Variables**, add `GEMINI_API_KEY`.
+4. Generate a public domain under **Settings** -> **Networking**.
+
+#### 4. Automated GitHub Actions CI/CD
+On every `git push` to `main`, the [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) pipeline automatically:
+- Validates and builds the React frontend production bundle.
+- Runs Python backend smoke tests.
+- Builds and packages the production Docker container into **GitHub Container Registry (`ghcr.io`)**.
+
+---
+
+### Option 2: Local Development
 
 #### 1. Backend (FastAPI)
 ```bash
@@ -65,7 +104,7 @@ npm run dev
 # Frontend runs at http://localhost:5173
 ```
 
-### Option 2: Full Docker Stack
+### Option 3: Full Docker Stack
 ```bash
 docker compose up --build
 ```

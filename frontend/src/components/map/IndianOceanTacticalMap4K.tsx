@@ -180,13 +180,30 @@ export const IndianOceanTacticalMap4K: React.FC<IndianOceanTacticalMap4KProps> =
       <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-none">
         <div className="flex items-center gap-2 pointer-events-auto bg-[#001020]/90 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-cyan-500/40 shadow-[0_0_20px_rgba(0,212,255,0.25)]">
           <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-          <span className="text-xs font-bold text-cyan-200 tracking-widest font-heading">
-            4K INDIAN OCEAN TACTICAL MARITIME MAP
-          </span>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-cyan-200 tracking-widest font-heading">
+                4K INDIAN OCEAN TACTICAL MARITIME MAP
+              </span>
+              <a
+                href="https://incois.gov.in"
+                target="_blank"
+                rel="noreferrer"
+                className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-cyan-950/90 text-cyan-300 border border-cyan-400/60 hover:text-white hover:border-cyan-200 transition-all flex items-center gap-1"
+                title="Open Official INCOIS Portal (incois.gov.in)"
+              >
+                <span>INCOIS</span>
+                <span className="text-[8px] text-teal-300">incois.gov.in ↗</span>
+              </a>
+            </div>
+            <span className="text-[9px] text-cyan-400/80 font-mono">
+              Primary Reference: INCOIS Ocean State Forecast • MoES, Govt. of India
+            </span>
+          </div>
           <span className="text-[10px] text-cyan-400/60 hidden sm:inline">|</span>
           <span className="text-[10px] font-bold text-teal-300 hidden sm:inline flex items-center gap-1">
             <Radio className="w-3 h-3 text-teal-400 animate-pulse" />
-            {isOffline ? 'OFFLINE CACHED' : '1-MIN CONTINUOUS SYNC'}
+            {isOffline ? 'OFFLINE CACHED' : 'INCOIS 1-MIN CONTINUOUS SYNC'}
           </span>
           {lastUpdated && (
             <span className="text-[9px] text-slate-400 hidden md:inline">
@@ -653,8 +670,8 @@ export const IndianOceanTacticalMap4K: React.FC<IndianOceanTacticalMap4KProps> =
               </div>
             )}
 
-            <div className="text-[9px] text-slate-400 flex justify-between items-center pt-0.5">
-              <span>Click to query NEREUS AI Voice Agent</span>
+            <div className="text-[9px] text-slate-400 flex justify-between items-center pt-0.5 border-t border-cyan-500/20">
+              <span className="text-cyan-300 font-bold">Data Reference: INCOIS (incois.gov.in)</span>
               <span className="text-teal-300">VHF CH 16 / CG 1554</span>
             </div>
           </div>
@@ -679,9 +696,18 @@ export const IndianOceanTacticalMap4K: React.FC<IndianOceanTacticalMap4KProps> =
         </div>
 
         <div className="hidden md:flex items-center gap-4">
+          <a
+            href="https://incois.gov.in"
+            target="_blank"
+            rel="noreferrer"
+            className="text-cyan-300 font-bold hover:text-white transition-all flex items-center gap-1"
+          >
+            AUTHORITATIVE REFERENCE: INCOIS (incois.gov.in) ↗
+          </a>
+          <span>•</span>
           <span>9 MARITIME STATES + 2 ARCHIPELAGOS</span>
           <span>•</span>
-          <span className="text-cyan-400 font-bold">4K VECTOR PROJECTION (HIGH CLARITY)</span>
+          <span className="text-cyan-400 font-bold">4K VECTOR PROJECTION</span>
         </div>
 
         <div className="flex items-center gap-2 text-cyan-400/80">
