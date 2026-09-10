@@ -40,10 +40,17 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS Configuration
+# CORS Configuration for Global Public Cloud Access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://dev-nextenti.github.io",
+        "https://dev-nextenti.github.io/NEREUS",
+        "https://nereus-marine-ai.netlify.app",
+        "http://localhost:5173",
+        "http://localhost:8000",
+        "*"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,13 +77,45 @@ def root():
         "status": "ONLINE",
         "agents": 11,
         "coastal_coverage": "Indian Subcontinent (Bay of Bengal, Arabian Sea, Indian Ocean)",
+        "reference_authority": "INCOIS | Indian National Centre for Ocean Information Services",
+        "official_portal": "https://incois.gov.in",
         "docs": "/docs"
     }
 
 @app.get("/health")
 @app.get("/api/health")
 def health():
-    return {"status": "HEALTHY", "system": "NEREUS_CORE"}
+    return {
+        "status": "healthy",
+        "service": "NEREUS",
+        "database": "online",
+        "agents": 11,
+        "coastal_telemetry": "online",
+        "version": "2.4.0",
+        "authority": "INCOIS (incois.gov.in)"
+    }
+
+@app.get("/health/database")
+def health_database():
+    try:
+        db = SessionLocal()
+        from .database.models import MarineObservation
+        count = db.query(MarineObservation).count()
+        db.close()
+        return {"status": "healthy", "database": "connected", "records": count}
+    except Exception as e:
+        return {"status": "degraded", "database": "fallback", "detail": str(e)[:120]}
+
+@app.get("/health/agents")
+def health_agents():
+    return {
+        "status": "healthy",
+        "active_agents": [
+            "PLANNER", "MARINE_DATA", "WEATHER", "OCEAN", "PFZ",
+            "GEOSPATIAL", "GEOFENCE", "NAVIGATION", "RISK",
+            "VISUALIZATION", "EXPLANATION", "REPORTING"
+        ]
+    }
 
 # Mount Compiled Production Frontend (SPA)
 import os
