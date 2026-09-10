@@ -1,0 +1,3 @@
+/api/*  https://nereus-marine-intelligence-ptz2.onrender.com/api/:splat  200!
+/health https://nereus-marine-intelligence-ptz2.onrender.com/health  200!
+/*      /index.html                                                  200
