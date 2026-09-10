@@ -391,6 +391,7 @@ export const App: React.FC = () => {
   // Voice Recognition Handler (Launches Full Holographic AI Voice Agent)
   const handleVoiceToggle = () => {
     soundEffects.playMicStart();
+    setIsVoiceModalOpen(false);
     setIsAIAgentOpen(true);
   };
 
@@ -645,7 +646,7 @@ export const App: React.FC = () => {
         isSpeaking={isSpeaking}
         onSendMessage={handleSendMessage}
         onVoiceToggle={handleVoiceToggle}
-        onOpenVoiceModal={() => setIsVoiceModalOpen(true)}
+        onOpenVoiceModal={() => setIsAIAgentOpen(true)}
         onOpenApiKeyModal={() => setIsApiKeyModalOpen(true)}
         onSelectCoast={handleSelectCoast}
         onPinpointLocation={handlePinpointLocation}
@@ -719,7 +720,10 @@ export const App: React.FC = () => {
         onToggleMic={handleVoiceToggle}
         lastTranscript={lastTranscript}
         lastResponse={lastResponse}
-        onSendQuery={handleSendMessage}
+        onSendQuery={(query) => {
+          setIsVoiceModalOpen(false);
+          setIsAIAgentOpen(true);
+        }}
         onSpeakText={speakText}
         onStopSpeaking={stopSpeaking}
         autoSpeak={autoSpeak}

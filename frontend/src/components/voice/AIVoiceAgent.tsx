@@ -33,6 +33,7 @@ interface Transcript {
   text: string;
   verdict?: "SAFE" | "CAUTION" | "DANGER";
   timestamp: Date;
+  audioBase64?: string;
 }
 
 interface AIVoiceAgentProps {
@@ -68,12 +69,15 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
   const [transcripts, setTranscripts] = useState<Transcript[]>([]);
   const [interimText, setInterimText] = useState("");
   const [textInput, setTextInput] = useState("");
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const [audioLevel, setAudioLevel] = useState<number[]>([4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]);
 
   const recognitionRef = useRef<any>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const transcriptEndRef = useRef<HTMLDivElement>(null);
   const animIntervalRef = useRef<any>(null);
+  const lastSpeechTextRef = useRef<string>("");
+  const hasDispatchedRef = useRef<boolean>(false);
 
   // Auto-scroll transcript
   useEffect(() => {
@@ -111,6 +115,7 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     if (!isOpen) {
       stopListening();
       stopAudio();
+      setSpeechError(null);
     }
   }, [isOpen]);
 
@@ -120,6 +125,29 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
       audioPlayerRef.current = null;
     }
     setIsSpeaking(false);
+  };
+
+  const playSpecificAudio = (b64: string) => {
+    stopAudio();
+    try {
+      const audioBlob = new Blob(
+        [Uint8Array.from(atob(b64), c => c.charCodeAt(0))],
+        { type: "audio/mp3" }
+      );
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      audioPlayerRef.current = audio;
+
+      setIsSpeaking(true);
+      audio.onended = () => {
+        setIsSpeaking(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+      audio.onerror = () => setIsSpeaking(false);
+      audio.play().catch(e => console.warn("[VoiceAgent] Audio playback notice:", e));
+    } catch (e) {
+      console.error("[VoiceAgent] Audio decoding error:", e);
+    }
   };
 
   // ── Send Query to NEREUS Voice Agent Backend ────────────────────────────────
@@ -150,8 +178,12 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     }
 
     try {
-      // Pass saved custom Gemini API key if available
-      const savedKey = localStorage.getItem("nereus_gemini_api_key") || "";
+      // Pass saved custom Gemini API key if available (purging deprecated key)
+      let savedKey = localStorage.getItem("nereus_gemini_api_key") || "";
+      if (savedKey === "AQ.Ab8RN6JELcUuN5JYpzIqk2yQ0DbeIkv2cz0Mw7O8QHBesklsog") {
+        localStorage.removeItem("nereus_gemini_api_key");
+        savedKey = "";
+      }
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (savedKey) headers["x-gemini-api-key"] = savedKey;
 
@@ -206,27 +238,14 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
           role: "model",
           text: data.response_text || "Advisory generated.",
           verdict: data.safety_verdict,
-          timestamp: new Date()
+          timestamp: new Date(),
+          audioBase64: data.audio_base64
         }
       ]);
 
       // Play Neural Audio
       if (data.audio_base64) {
-        const audioBlob = new Blob(
-          [Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0))],
-          { type: "audio/mp3" }
-        );
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audioPlayerRef.current = audio;
-
-        setIsSpeaking(true);
-        audio.onended = () => {
-          setIsSpeaking(false);
-          URL.revokeObjectURL(audioUrl);
-        };
-        audio.onerror = () => setIsSpeaking(false);
-        await audio.play();
+        playSpecificAudio(data.audio_base64);
       }
     } catch (err: any) {
       console.error("[VoiceAgent] Query failed:", err);
@@ -255,11 +274,22 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. Please use Chrome or Edge.");
+      setSpeechError("Speech recognition is not supported in this browser. Please use Google Chrome or Microsoft Edge, or type your query below.");
       return;
     }
 
+    setSpeechError(null);
     stopAudio();
+    lastSpeechTextRef.current = "";
+    hasDispatchedRef.current = false;
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {}
+      recognitionRef.current = null;
+    }
+
     const recognition = new SpeechRecognition();
     recognitionRef.current = recognition;
 
@@ -290,49 +320,90 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
     recognition.onstart = () => {
       setIsListening(true);
       setInterimText("");
+      setSpeechError(null);
     };
 
     recognition.onresult = (event: any) => {
-      let currentTranscript = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        currentTranscript += event.results[i][0].transcript;
-      }
-      setInterimText(currentTranscript);
+      let finalTranscript = "";
+      let interimTranscript = "";
 
-      if (isAutoDetect && currentTranscript.trim()) {
-        const detected = detectLanguageFromText(currentTranscript);
-        setDetectedLanguage(detected);
+      for (let i = 0; i < event.results.length; i++) {
+        const item = event.results[i];
+        if (item.isFinal) {
+          finalTranscript += item[0].transcript + " ";
+        } else {
+          interimTranscript += item[0].transcript;
+        }
       }
 
-      // If final
-      if (event.results[0].isFinal) {
+      const combined = (finalTranscript + interimTranscript).trim();
+      if (combined) {
+        lastSpeechTextRef.current = combined;
+        setInterimText(combined);
+
+        if (isAutoDetect) {
+          const detected = detectLanguageFromText(combined);
+          setDetectedLanguage(detected);
+        }
+      }
+
+      const hasFinal = Array.from(event.results).some((r: any) => r.isFinal);
+      if (hasFinal && finalTranscript.trim() && !hasDispatchedRef.current) {
+        hasDispatchedRef.current = true;
         setIsListening(false);
         setInterimText("");
-        sendQueryToAI(currentTranscript);
+        sendQueryToAI(finalTranscript.trim());
       }
     };
 
     recognition.onerror = (event: any) => {
-      console.warn("[VoiceAgent] Speech error:", event.error);
+      const err = event.error;
+      console.warn("[VoiceAgent] Speech error:", err);
       setIsListening(false);
-      setInterimText("");
+
+      if (err === "no-speech") {
+        if (!hasDispatchedRef.current && lastSpeechTextRef.current.trim()) {
+          hasDispatchedRef.current = true;
+          const text = lastSpeechTextRef.current.trim();
+          setInterimText("");
+          sendQueryToAI(text);
+          return;
+        }
+        setSpeechError("No speech detected. Please tap the mic and speak clearly.");
+      } else if (err === "not-allowed" || err === "service-not-allowed") {
+        setSpeechError("Microphone access was blocked. Please allow microphone permissions in your browser bar, or type below.");
+      } else if (err === "network") {
+        setSpeechError("Speech recognition network error. Please try again or type below.");
+      } else {
+        setSpeechError(`Speech error (${err}). Please try again or type below.`);
+      }
     };
 
     recognition.onend = () => {
       setIsListening(false);
+      // If user spoke and speech stopped before an explicit isFinal flag, dispatch now!
+      if (!hasDispatchedRef.current && lastSpeechTextRef.current.trim()) {
+        hasDispatchedRef.current = true;
+        const text = lastSpeechTextRef.current.trim();
+        setInterimText("");
+        sendQueryToAI(text);
+      }
     };
 
     try {
       recognition.start();
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error("[VoiceAgent] recognition.start failed:", e);
       setIsListening(false);
+      setSpeechError("Could not start microphone. Please check browser permissions or type below.");
     }
   };
 
   const stopListening = () => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {}
       recognitionRef.current = null;
     }
     setIsListening(false);
@@ -632,6 +703,17 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
                     "{interimText}"
                   </div>
                 )}
+                {speechError && (
+                  <div className="mt-2 px-3 py-1.5 rounded-xl bg-red-950/90 border border-red-500/50 text-red-200 text-xs font-mono max-w-lg mx-auto flex items-center justify-between gap-2 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
+                    <span className="flex-1 text-center">{speechError}</span>
+                    <button
+                      onClick={() => setSpeechError(null)}
+                      className="p-1 hover:text-white text-red-400 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
                 {selectedCoord && (
                   <div className="mt-2 flex items-center justify-center gap-2">
                     <button
@@ -734,6 +816,19 @@ export const AIVoiceAgent: React.FC<AIVoiceAgentProps> = ({
                         )}
                       </div>
                       <div className="whitespace-pre-line text-sm">{t.text}</div>
+                      {t.role === "model" && t.audioBase64 && (
+                        <div className="mt-2 pt-2 border-t border-teal-500/20 flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => playSpecificAudio(t.audioBase64!)}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-teal-500/20 hover:bg-teal-500/30 border border-teal-400/40 text-teal-200 text-[10px] font-mono transition-all cursor-pointer shadow-[0_0_10px_rgba(0,240,181,0.2)]"
+                            title="Replay Voice Speech"
+                          >
+                            <Volume2 className="w-3.5 h-3.5 text-teal-300" />
+                            <span>🔊 Replay Voice</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {t.role === "user" && (
                       <div className="w-8 h-8 rounded-xl bg-cyan-900/60 border border-cyan-400/40 flex items-center justify-center shrink-0 mt-0.5">

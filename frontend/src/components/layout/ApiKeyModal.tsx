@@ -52,7 +52,11 @@ export const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
     if (!isOpen) return;
 
     // Load from localStorage if present
-    const savedLocal = localStorage.getItem("nereus_gemini_api_key") || "";
+    let savedLocal = localStorage.getItem("nereus_gemini_api_key") || "";
+    if (savedLocal === "AQ.Ab8RN6JELcUuN5JYpzIqk2yQ0DbeIkv2cz0Mw7O8QHBesklsog") {
+      localStorage.removeItem("nereus_gemini_api_key");
+      savedLocal = "";
+    }
     if (savedLocal) {
       setApiKeyInput(savedLocal);
     }

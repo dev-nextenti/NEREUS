@@ -37,17 +37,22 @@ def _read_config_file() -> Dict[str, Any]:
     return {}
 
 
+OLD_DEPRECATED_KEY = "AQ.Ab8RN6JELcUuN5JYpzIqk2yQ0DbeIkv2cz0Mw7O8QHBesklsog"
+
+
 def get_gemini_api_key(client_override: Optional[str] = None) -> str:
     """
     Resolves the active Gemini API key in order of precedence:
-    1. Direct client header / parameter override (if non-empty)
+    1. Direct client header / parameter override (if non-empty and not deprecated)
     2. nereus/backend/config/api_keys.json
     3. Environment variable GEMINI_API_KEY
     4. Mark-LI config/api_keys.json
     5. Hardcoded default fallback key
     """
     if client_override and client_override.strip() and len(client_override.strip()) > 8:
-        return client_override.strip()
+        cleaned = client_override.strip()
+        if cleaned != OLD_DEPRECATED_KEY:
+            return cleaned
 
     cfg = _read_config_file()
     key = cfg.get("gemini_api_key", "").strip()
